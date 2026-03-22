@@ -1,1 +1,0 @@
-# code hàm kiểm tra dữ liệu đầu vào có thỏa mãn các ràng buộc hay không ở đây
