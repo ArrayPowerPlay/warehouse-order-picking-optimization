@@ -3,27 +3,32 @@ from ortools.sat.python import cp_model
 
 def solve():
     input_data = sys.stdin.read().split()
+    if not input_data: return
     iterator = iter(input_data)
     N = int(next(iterator))
     M = int(next(iterator))
 
-    Q = []
-    for _ in range(N):
-        row = [int(next(iterator)) for _ in range(M)]
-        Q.append(row)
+    #Tạo ma trận (N+1) x (M+1) và bỏ trống hàng 0, cột 0
+    Q = [[0] * (M + 1) for _ in range(N + 1)]
+    for i in range(1, N + 1):
+        for j in range(1, M + 1):
+            Q[i][j] = int(next(iterator))
 
     distances = []
     for _ in range(M + 1):
         row = [int(next(iterator)) for _ in range(M + 1)]
         distances.append(row)
 
-    q = [int(next(iterator)) for _ in range(N)]
+    #Tạo mảng N+1 phần tử và bỏ trống index 0
+    q = [0] * (N + 1)
+    for i in range(1, N + 1):
+        q[i] = int(next(iterator))
 
     model = cp_model.CpModel()
 
-    #Nếu đến kệ j thì x[j] = 1, không đến thì x[j] = 0
-    x = [model.NewBoolVar(f'x_{j}') for j in range(M + 1)] 
-    #Xuất phát từ điểm 0
+    # Nếu đến kệ j thì x[j] = 1, không đến thì x[j] = 0
+    x = [model.new_bool_var(f'x_{j}') for j in range(M + 1)] 
+    # Xuất phát từ điểm 0
     model.Add(x[0] == 1)
 
     arcs = [] #List
@@ -31,17 +36,17 @@ def solve():
     for i in range(M + 1):
         for j in range(M + 1):
             if i == j: continue
-            var = model.NewBoolVar(f'arc_{i}_{j}')
+            var = model.new_bool_var(f'arc_{i}_{j}')
             arc_vars[(i, j)] = var
             arcs.append((i, j, var)) #cần đủ 3 biến để dùng cho AddCircuit
 
-        #Ràng buộc về số lượng hàng
-    for i in range(N):
-        model.Add(sum(Q[i][j-1] * x[j] for j in range(1, M + 1)) >= q[i])
+    # Ràng buộc về số lượng hàng
+    for i in range(1, N + 1):
+        model.Add(sum(Q[i][j] * x[j] for j in range(1, M + 1)) >= q[i])
 
-    #Ràng buộc về lộ trình, sử dụng AddCircuit
+    # Ràng buộc về lộ trình, sử dụng AddCircuit
     for i in range(M + 1):
-        self_loop = model.NewBoolVar(f'loop_{i}')
+        self_loop = model.new_bool_var(f'loop_{i}')
         arcs.append((i, i, self_loop)) #Tạo chu trình từ i đến i
         #Addcruit: các node không được chọn cần phải có cung tự nối 
         model.Add(self_loop == x[i].Not()) #Nếu kệ i được chọn thì self_loop = 0 => bỏ qua tạo chu trình từ i đến i
@@ -52,7 +57,7 @@ def solve():
 
     model.AddCircuit(arcs)
 
-    #Hàm mục tiêu: Tối thiểu quãng đường 
+    # Hàm mục tiêu: Tối thiểu quãng đường 
     total_distance = sum(arc_vars[(i, j)] * distances[i][j] for i, j in arc_vars)
     model.Minimize(total_distance)
 
@@ -63,14 +68,18 @@ def solve():
     if status == cp_model.OPTIMAL or status == cp_model.FEASIBLE:
         current_node = 0
         route = []
+        visited = set()
 
         while True:
+            found = False
             for j in range(M + 1):
-                if current_node != j and solver.Value(arc_vars[(current_node, j)]):
+                if current_node != j and solver.Value(arc_vars[(current_node, j)]) == 1:
                     current_node = j
+                    found = True
                     break
-            if current_node == 0:
+            if not found or current_node == 0 or current_node in visited:
                 break
+            visited.add(current_node)
             route.append(current_node) #Chỉ lưu các kệ
 
         print(len(route))
@@ -78,5 +87,3 @@ def solve():
 
 if __name__ == '__main__':
     solve()
-                                                    
-                
