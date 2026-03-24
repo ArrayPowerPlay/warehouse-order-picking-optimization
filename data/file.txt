@@ -1,2 +1,0 @@
-# Ai code đoạn này thì sau khi gen data xóa file này đi nhé
-# Github ko cho push folder trống

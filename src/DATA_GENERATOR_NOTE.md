@@ -17,7 +17,7 @@ Một kho hàng có M kệ đánh số từ 1 đến M. Kho lưu N loại sản 
 
 ## 2. Định dạng file đầu ra
 
-File được lưu với phần mở rộng `.in`, đặt cùng thư mục với `data_generator.py`. Tên file theo cấu trúc:
+File được lưu với phần mở rộng `.in`, đặt trong thư mục `data/` (cùng cấp với `src/`). Tên file theo cấu trúc:
 
 ```
 test_{N}_{M}_{YYYYMMDD_HHMMSS}.in
@@ -59,16 +59,19 @@ Chương trình chạy hoàn toàn qua giao diện dòng lệnh tương tác, h�
 
 ### Bước 1 — Nhập tham số cấu hình
 
-Chương trình hỏi tuần tự 6 thông tin. Với mỗi câu hỏi, nhấn Enter để chấp nhận giá trị mặc định. Nếu nhập sai kiểu hoặc ngoài phạm vi, chương trình yêu cầu nhập lại ngay tại chỗ.
+Chương trình hỏi tuần tự 5 thông tin. Với mỗi câu hỏi, nhấn Enter để chấp nhận giá trị mặc định. Nếu nhập sai kiểu hoặc ngoài phạm vi, chương trình yêu cầu nhập lại ngay tại chỗ.
 
 | Tham số | Kiểu | Ràng buộc | Mặc định |
 |---|---|---|---|
 | N — số loại sản phẩm | Số nguyên dương | 1 <= N <= 50 | 5 |
 | M — số kệ hàng | Số nguyên dương | 1 <= M <= 1000 | 10 |
-| Khoảng cách số thực? | Y / N | Không phân biệt hoa thường | N |
-| COORD_BOUND | Số nguyên dương | M <= COORD_BOUND <= 759250124 | 759250124 |
-| MAX_RESOURCE_I_PER_SHELF | Số nguyên dương | 1 <= giá trị <= 1000 | 100 |
-| Chế độ tính khả thi q | Y / N / D | Không phân biệt hoa thường | D |
+| COORD_BOUND — biên tọa độ | Số nguyên dương | M <= COORD_BOUND <= 759250124 | 759250124 |
+| MAX_RESOURCE_I_PER_SHELF — tồn kho tối đa mỗi kệ | Số nguyên dương | 1 <= giá trị <= 1000 | 100 |
+| Chế độ sinh q | Y / N / D | Nhập Y, N hoặc D (có thể gõ chữ thường) | D |
+
+**COORD_BOUND** quyết định kích thước hộp tọa độ trong bước sinh vị trí kệ. Tất cả tọa độ đều nằm trong đoạn $[-\text{COORD\_BOUND}, \text{COORD\_BOUND}]$. Giá trị lớn → kệ phân tán rộng hơn; giá trị nhỏ → kệ gần nhau hơn. Chương trình luôn nhắc rõ phạm vi hợp lệ trước khi yêu cầu nhập.
+
+**MAX_RESOURCE_I_PER_SHELF** là tồn kho tối đa một kệ có thể chứa cho mỗi loại sản phẩm. Nó vừa là biên trên của từng phần tử $Q[i][j]$, vừa quyết định miền giá trị của vector $q$ khi chọn chế độ mặc định (D).
 
 Chi tiết về COORD_BOUND và chế độ tính khả thi được giải thích ở Bước 3 và Bước 4.
 
@@ -92,12 +95,7 @@ Tọa độ được giới hạn trong [-COORD_BOUND, COORD_BOUND] theo hai rà
 
 **Giai đoạn 3b — Tính khoảng cách:**
 
-Khoảng cách Euclidean giữa mọi cặp điểm được tính và xử lý theo lựa chọn ở Bước 1:
-
-- Số thực (Y): làm tròn đến 2 chữ số thập phân.
-- Số nguyên (N): làm tròn lên theo `math.ceil()`.
-
-Ma trận kết quả là ma trận đối xứng (M+1) x (M+1), đường chéo bằng 0.
+Khoảng cách Euclidean giữa mọi cặp điểm được tính và luôn được làm tròn lên số nguyên bằng `math.ceil()`. Ma trận kết quả là ma trận đối xứng (M+1) x (M+1), đường chéo bằng 0.
 
 ### Bước 4 — Sinh vector yêu cầu q (N phần tử)
 
@@ -129,9 +127,8 @@ q[i] được chọn ngẫu nhiên trong [0, MAX_RESOURCE_I_PER_SHELF * M]. Khô
 |---|---|---|
 | N | 5 | Số hàng ma trận Q; độ dài vector q |
 | M | 10 | Số cột ma trận Q; kích thước ma trận khoảng cách |
-| use_float | N (False) | Kiểu dữ liệu của ma trận khoảng cách |
-| COORD_BOUND | 759250124 | Vùng sinh tọa độ; ảnh hưởng đến phân bố khoảng cách |
-| MAX_RESOURCE_I_PER_SHELF | 100 | Biên trên của Q[i][j] và gián tiếp của q[i] khi chọn chế độ D |
+| COORD_BOUND | 759250124 | Kích thước vùng đặt tọa độ kệ |
+| MAX_RESOURCE_I_PER_SHELF | 100 | Tồn kho tối đa mỗi kệ cho từng loại |
 | feasibility | D | Cách sinh vector q |
 
 ---
@@ -147,10 +144,8 @@ data_generator.py
 |
 +-- Helpers
 |   +-- _ask_int()          nhập số nguyên có validation + mặc định
-|   +-- _ask_bool()         nhập Y/N có validation + mặc định
-|   +-- _ask_feasibility()  nhập Y/N/D có validation + mặc định
-|   +-- _fmt()              định dạng giá trị khoảng cách ra chuỗi
-|   +-- _euclidean()        tính khoảng cách Euclidean và làm tròn
+|   +-- _ask_feasibility()  nhập Y/N/D (chấp nhận chữ hoa và chữ thường)
+|   +-- _euclidean()        tính khoảng cách Euclidean và làm tròn lên số nguyên
 |
 +-- Pipeline chính
 |   +-- step1_get_params()            nhập 6 tham số từ người dùng
@@ -175,8 +170,6 @@ Phiên chạy dưới đây dùng mọi giá trị mặc định ngoại trừ N
 
 Nhập số loại sản phẩm  N  (1 <= N <= 50)    [mặc định = 5]  : 6
 Nhập số kệ hàng        M  (1 <= M <= 1000)  [mặc định = 10] : 5
-Khoảng cách dạng số thực?  Y = số thực / N = số nguyên  [mặc định = N]:
-  -> Dùng giá trị mặc định: số nguyên (N)
 
   (Giới hạn hợp lệ cho COORD_BOUND: [5, 759250124])
 Nhập COORD_BOUND  (>= M=5, <= 759250124)  [mặc định = 759250124]:
@@ -185,7 +178,7 @@ Nhập COORD_BOUND  (>= M=5, <= 759250124)  [mặc định = 759250124]:
 Nhập MAX_RESOURCE_I_PER_SHELF  (1 <= giá trị <= 1000)  [mặc định = 100]:
   -> Dùng giá trị mặc định: 100
 
-Chế độ sinh yêu cầu q:
+Chế độ sinh yêu cầu q (nhập Y, N hoặc D):
   Y = đảm bảo có nghiệm (feasible)
   N = đảm bảo vô nghiệm (infeasible)
   D = hoàn toàn ngẫu nhiên (mặc định)
@@ -213,7 +206,7 @@ Da tao file thanh cong!
 
 **Chế độ infeasible và trường hợp biên:** Khi tổng Q[i][j] đã bằng MAX_RESOURCE_I_PER_SHELF * M (kho đầy tối đa), không còn giá trị q[i] nào trong [0, max_demand] lớn hơn tổng kho. Chương trình xử lý bằng cách mở rộng cận trên lên `max(supply + 100, max_demand)`, đảm bảo luôn sinh được q[i] > supply.
 
-**Dấu thập phân:** File ghi với encoding UTF-8, dùng dấu chấm làm dấu thập phân theo quy ước quốc tế, không phụ thuộc locale của hệ điều hành.
+**Định dạng số:** File ghi với encoding UTF-8, toàn bộ ma trận khoảng cách đều là số nguyên dương (làm tròn lên) và sử dụng dấu chấm cho bất kỳ giá trị nào cần dấu phân cách thập phân trong tương lai.
 
 **Tính đối xứng ma trận khoảng cách:** d[i][j] = d[j][i] và d[i][i] = 0 với mọi i, j — đúng với khoảng cách Euclidean trong không gian 2D.
 

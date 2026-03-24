@@ -12,7 +12,7 @@ def read_input():
     Q = [[0] * (M + 1)]
 
     for _ in range(N):
-        row = list(map(int, input().split()))
+        row = [0] + list(map(int, input().split()))
         Q.append(row)
 
     d = []
@@ -20,7 +20,10 @@ def read_input():
         row = list(map(int, input().split()))
         d.append(row)
 
-    
+    q = [0]
+    q += list(map(int, input().split()))
+
+    return N, M, Q, d, q
 
 
 # Code hàm so sánh kết quả của thuật toán hiện tại vs thuật toán giải chính xác
