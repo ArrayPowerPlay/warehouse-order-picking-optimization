@@ -6,16 +6,24 @@ def solve():
     it = iter(input_data)
     N = int(next(it))
     M = int(next(it))
-    Q = [[int(next(it)) for _ in range(M)] for _ in range(N)]
+    
+    Q = [[0] * (M + 1) for _ in range(N + 1)]
+    for i in range(1, N + 1):
+        for j in range(1, M + 1):
+            Q[i][j] = int(next(it))
+            
     dist = [[int(next(it)) for _ in range(M + 1)] for _ in range(M + 1)]
-    q_req = [int(next(it)) for _ in range(N)]
+    
+    q_req = [0] * (N + 1)
+    for i in range(1, N + 1):
+        q_req[i] = int(next(it))
 
-    current_collected = [0] * N
+    current_collected = [0] * (N + 1)
     visited = set()
     current_node = 0
     route = []
 
-    while any(current_collected[p] < q_req[p] for p in range(N)):
+    while any(current_collected[p] < q_req[p] for p in range(1, N + 1)):
         best_next = -1
         best_score = float('inf')
         
@@ -24,7 +32,7 @@ def solve():
                 useful_amount = 0
                 for p in range(N):
                     if current_collected[p] < q_req[p]:
-                        useful_amount += min(Q[p][j-1], q_req[p] - current_collected[p])
+                        useful_amount += min(Q[p][j], q_req[p] - current_collected[p])
                 
                 if useful_amount > 0:
                     score = dist[current_node][j] / (useful_amount + 1e-6)
@@ -40,7 +48,7 @@ def solve():
         current_node = best_next
         
         for p in range(N):
-            current_collected[p] += Q[p][best_next-1]
+            current_collected[p] += Q[p][best_next]
 
     if route:
         print(len(route))
