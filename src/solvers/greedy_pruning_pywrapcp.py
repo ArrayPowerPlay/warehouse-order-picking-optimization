@@ -8,9 +8,17 @@ def solve():
     it = iter(input_data)
     N = int(next(it))
     M = int(next(it))
-    Q = [[int(next(it)) for _ in range(M)] for _ in range(N)]
+    
+    Q = [[0] * (M + 1) for _ in range(N + 1)]
+    for i in range(1, N + 1):
+        for j in range(1, M + 1):
+            Q[i][j] = int(next(it))
+            
     dist = [[int(next(it)) for _ in range(M + 1)] for _ in range(M + 1)]
-    q_req = [int(next(it)) for _ in range(N)]
+    
+    q_req = [0] * (N + 1)
+    for i in range(1, N + 1):
+        q_req[i] = int(next(it))
 
     manager = pywrapcp.RoutingIndexManager(M + 1, 1, 0) #Tổng số địa điểm(M kệ + 1 cửa kho), 1 chu trình, điểm xuất phát từ 0
     routing = pywrapcp.RoutingModel(manager)
@@ -22,15 +30,15 @@ def solve():
     transit_cb = routing.RegisterTransitCallback(distance_callback)
     routing.SetArcCostEvaluatorOfAllVehicles(transit_cb)
 
-    for p in range(N):
+    for p in range(1, N + 1):
         def demand_callback(from_index, p=p): #Tránh đếm sản phẩm cuối N lần, p(tham số truyền vào) = p(giá trị của vòng lặp)
             node = manager.IndexToNode(from_index)
             if node == 0:
                 return 0
-            return Q[p][node - 1]
+            return Q[p][node]
 
         demand_id = routing.RegisterUnaryTransitCallback(demand_callback)
-        total = sum(Q[p][j] for j in range(M))
+        total = sum(Q[p][j] for j in range(1, M + 1))
         
         # Khởi tạo Dimension tích lũy hàng từ 0
         routing.AddDimension(demand_id, 0, total, True, f"Prod_{p}")
@@ -48,7 +56,7 @@ def solve():
         routing_enums_pb2.LocalSearchMetaheuristic.GUIDED_LOCAL_SEARCH) #Tránh bị kẹt ở tối ưu địa phương
     search_parameters.time_limit.seconds = 2
 
-    current_collected = [0] * N #Mảng N số 0 để đếm lượng hàng mỗi loại 
+    current_collected = [0] * (N + 1) #Mảng N + 1 số 0 để đếm lượng hàng mỗi loại(bỏ trống ngăn 0) 
     visited = set() #Ghi lại những kệ đã đi qua 
     current_node = 0
     initial_route_nodes = [] #Ghi lại lộ trình 
@@ -65,7 +73,7 @@ def solve():
                 for p in range(N):
                     if current_collected[p] < q_req[p]:
                         # Chỉ tính những món hàng mình còn thiếu, thừa không tính
-                        useful_amount += min(Q[p][j-1], q_req[p] - current_collected[p])
+                        useful_amount += min(Q[p][j], q_req[p] - current_collected[p])
                 
                 if useful_amount > 0:
                     # Điểm đánh giá = Quãng đường / Lượng hàng hữu ích
@@ -83,7 +91,7 @@ def solve():
         current_node = best_next
         
         for p in range(N):
-            current_collected[p] += Q[p][best_next-1]
+            current_collected[p] += Q[p][best_next]
 
     # Đi ngược từ cuối lộ trình lên, rút thử từng kệ ra xem có bị thiếu hàng không
     pruned_route = []
@@ -93,14 +101,14 @@ def solve():
         # Giả vờ trừ đi số hàng của kệ này
         can_remove = True
         for p in range(N):
-            if current_collected[p] - Q[p][node_to_test - 1] < q_req[p]:
+            if current_collected[p] - Q[p][node_to_test] < q_req[p]:
                 can_remove = False # Không thể bỏ vì sẽ làm thiếu hàng
                 break
         
         if can_remove:
             #Trừ số lượng hàng và bỏ qua kệ này 
             for p in range(N):
-                current_collected[p] -= Q[p][node_to_test - 1]
+                current_collected[p] -= Q[p][node_to_test]
         else:
             # Không bỏ được thì giữ lại
             pruned_route.append(node_to_test)
