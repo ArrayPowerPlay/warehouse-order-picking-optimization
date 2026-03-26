@@ -62,7 +62,7 @@ def solve():
     initial_route_nodes = [] #Ghi lại lộ trình 
     
     #Greedy 
-    while any(current_collected[p] < q_req[p] for p in range(N)):
+    while any(current_collected[p] < q_req[p] for p in range(1, N + 1)):
         best_next = -1
         best_score = float('inf')
         
@@ -70,7 +70,7 @@ def solve():
             if j not in visited:
                 # Tính tổng số lượng hàng cần thiết mà kệ j mang lại
                 useful_amount = 0
-                for p in range(N):
+                for p in range(1, N + 1):
                     if current_collected[p] < q_req[p]:
                         # Chỉ tính những món hàng mình còn thiếu, thừa không tính
                         useful_amount += min(Q[p][j], q_req[p] - current_collected[p])
@@ -90,7 +90,7 @@ def solve():
         initial_route_nodes.append(best_next)
         current_node = best_next
         
-        for p in range(N):
+        for p in range(1, N + 1):
             current_collected[p] += Q[p][best_next]
 
     # Đi ngược từ cuối lộ trình lên, rút thử từng kệ ra xem có bị thiếu hàng không
@@ -100,14 +100,14 @@ def solve():
         
         # Giả vờ trừ đi số hàng của kệ này
         can_remove = True
-        for p in range(N):
+        for p in range(1, N + 1):
             if current_collected[p] - Q[p][node_to_test] < q_req[p]:
                 can_remove = False # Không thể bỏ vì sẽ làm thiếu hàng
                 break
         
         if can_remove:
             #Trừ số lượng hàng và bỏ qua kệ này 
-            for p in range(N):
+            for p in range(1, N + 1):
                 current_collected[p] -= Q[p][node_to_test]
         else:
             # Không bỏ được thì giữ lại
