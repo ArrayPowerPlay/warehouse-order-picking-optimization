@@ -237,8 +237,9 @@ def write_output(
     filename = f"test_{n}_{m}_{timestamp}.in"
 
     # Lưu mọi file sinh ra dưới thư mục data ở root dự án
+    # Script nằm tại src/generators/ nên cần lên 2 cấp để tới project root
     script_dir = os.path.dirname(os.path.abspath(__file__))
-    out_dir = os.path.abspath(os.path.join(script_dir, os.pardir, "data"))
+    out_dir = os.path.abspath(os.path.join(script_dir, os.pardir, os.pardir, "data"))
     os.makedirs(out_dir, exist_ok=True)
     out_path = os.path.join(out_dir, filename)
 

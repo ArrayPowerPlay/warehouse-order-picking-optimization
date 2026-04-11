@@ -3,8 +3,8 @@ Implement simulated annealing for the warehouse order picking problem
 """
 import random
 import math
-import sys
 from utils import read_input
+import sys
 
 
 def simulated_annealing_solver(T_start, alpha, max_num_improves):
@@ -103,13 +103,13 @@ def simulated_annealing_solver(T_start, alpha, max_num_improves):
 
         temp = temp * alpha
 
-    return N, best_cost, best_route
+    return best_cost, best_route
 
 
 if __name__ == "__main__":
     T0 = 1000.0
     alpha = 0.9995
     max_num_improve = 5000
-    N, best_cost, best_route = simulated_annealing_solver(T0, alpha, max_num_improve)
-    print(N)
+    best_cost, best_route = simulated_annealing_solver(T0, alpha, max_num_improve)
+    print(len(best_route))
     print(*best_route)
