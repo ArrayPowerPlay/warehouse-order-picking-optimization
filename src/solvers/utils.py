@@ -158,7 +158,7 @@ def evaluator(
         total_distance = 0
 
     return {
-        "total_distance": total_distance,
+        "total_distance":  total_distance,
         "is_valid":        is_valid,
         "is_infeasible":   is_infeasible,
         "num_shelves":     len(route),
