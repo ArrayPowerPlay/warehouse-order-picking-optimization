@@ -1,4 +1,4 @@
-﻿# context.md — Warehouse Order Picking Optimization
+# context.md — Warehouse Order Picking Optimization
 
 > File này tổng hợp toàn bộ thông tin về project. Đọc file này trước khi làm việc với bất kỳ phần nào của codebase.
 
@@ -64,6 +64,7 @@ warehouse-order-picking-optimization/
 │   │   └── DATA_GENERATOR_NOTE.md  (tài liệu chi tiết về data_generator v2.0.0)
 │   └── solvers/
 │       ├── utils.py                    (read_input, evaluator, validator)
+│       ├── settings.py                 (cấu hình hệ thống: time_limit, runs)
 │       ├── greedy.py                   (Greedy heuristic)
 │       ├── greedy_pruning_pywrapcp.py  (Greedy + Pruning + GLS)
 │       ├── simulated_annealing.py      (Simulated Annealing)
@@ -103,20 +104,20 @@ Dừng khi đủ hàng hoặc không còn kệ có ích. Không có tham số tu
 2. Pruning (duyệt ngược) → loại kệ thừa không ảnh hưởng khả thi
 3. OR-Tools pywrapcp (Guided Local Search) → tối ưu thứ tự kệ đã chọn
 
-**Tham số tune:** `time_limit.seconds` (hiện = 2s)
+**Tham số tune:** Dừng theo `time_limit` trong `settings.py`.
 
-### 4.3 Simulated Annealing (simulated_annealing.py)
-**Loại:** Metaheuristic
-**Biểu diễn nghiệm:** Hoán vị đầy đủ M kệ. `evaluate_route()` chuyển permutation → route thực tế.
-**Hàm lân cận:** Swap ngẫu nhiên 2 vị trí trong permutation.
-**Điều kiện dừng:** temp < 0.001 HOẶC no_improve_cnt >= max_num_improves.
+### 4.3 Adaptive Simulated Annealing (adaptive_simulated_annealing.py)
+**Loại:** Metaheuristic (Nâng cấp từ SA gốc)
+**Biểu diễn nghiệm:** Hoán vị đầy đủ M kệ. `evaluate_route()` chuyển permutation → route.
+**Hàm lân cận (ALNS):** Swap, Insert, 2-Opt với cơ chế cập nhật trọng số động.
+**Điều kiện dừng:** Dựa trên `time_limit` tương ứng với quy mô bài toán trong `settings.py`.
 
 **Tham số tune (val_set):**
-| Tham số | Ý nghĩa | Mặc định |
+| Tham số | Ý nghĩa | Mặc định tune |
 |---|---|---|
-| T_start | Nhiệt độ ban đầu | 1000.0 |
-| alpha | Hệ số làm lạnh | 0.9995 |
-| max_num_improves | Số vòng không cải thiện → dừng | 5000 |
+| alpha | Hệ số làm lạnh cơ sở | 0.99, 0.995, 0.999 |
+| max_no_improve | Vòng không cải thiện để Re-anneal | 1000, 2000, 3000 |
+| reheat_ratio | Tỷ lệ phục hồi nhiệt | 0.2, 0.3, 0.5 |
 
 ### 4.4 Genetic Algorithm (genetic_algorithm.py)
 **Loại:** Metaheuristic | **Trạng thái: TODO – chưa implement**
@@ -125,7 +126,7 @@ Dừng khi đủ hàng hoặc không còn kệ có ích. Không có tham số tu
 **Loại:** Exact Solver
 **Mô hình:** Biến nhị phân x[j] + arc[i][j] + AddCircuit → chu trình Hamiltonian.
 **Ràng buộc:** Σ_j Q[i][j]*x[j] >= q[i] với mọi i.
-**Tham số:** max_time_in_seconds = 2.0
+**Tham số:** max_time_in_seconds = theo `time_limit` trong `settings.py`.
 
 ---
 
@@ -158,7 +159,12 @@ batch_generator.py
       ↓
 PHASE 1: TUNING (val_set)
   notebooks/tuning/*.ipynb
-  → Grid Search tham số
+  - Xác định cost_reference:
+      + Nhóm small: Dạy CP-SAT lấy nghiệm tối ưu tuyệt đối.
+      + Nhóm medium & large: Chạy TẤT CẢ cấu hình của các thuật toán trong time_limit, lấy kết quả tốt nhất làm reference.
+      + LƯU Ý: Cần viết một script/notebook (vd: `generate_cost_reference.ipynb`) chạy quét toàn bộ `val_set` và lưu bảng `cost_reference` ra file CSV hoặc JSON. Dữ liệu này sẽ dùng làm chuẩn (baseline) để tính RPD cho quá trình tuning sau này.
+  - Chạy Grid Search: Mỗi cấu hình chạy `NUM_RUNS_PER_CONFIG = 5` lần (với các seed khác nhau).
+  - Đánh giá bằng RPD (Relative Percentage Deviation).
   → Lưu kết quả vào results/val_results/
       ↓ bộ tham số tốt nhất
 PHASE 2: FINAL EVAL (test_set)
@@ -237,10 +243,11 @@ Python >= 3.11
 | batch_generator.py | ✅ Hoàn thiện |
 | greedy.py | ✅ Implement xong |
 | greedy_pruning_pywrapcp.py | ✅ Implement xong |
-| simulated_annealing.py | ✅ Implement xong – cần tune tham số |
+| simulated_annealing.py (ASA) | ✅ Implement xong |
 | genetic_algorithm.py | ❌ Chưa implement |
 | OR_Tools_cp_sat.py | ✅ Implement xong (exact solver) |
 | utils.py (evaluator, validator) | ✅ Implement xong |
+| Script/Notebook sinh cost_reference | ⬜ Chưa implement (TODO) |
 | Notebook SA tuning | ⬜ Chưa điền code |
 | Notebook GA tuning | ⬜ Chưa điền code |
 | Notebook final evaluation | ⬜ Chưa điền code |
