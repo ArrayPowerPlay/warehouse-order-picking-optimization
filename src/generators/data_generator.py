@@ -132,9 +132,124 @@ def step2_gen_resource_matrix(n: int, m: int, max_resource: int) -> list[list[in
 
 # === Bước 3: Sinh ma trận khoảng cách  ((M+1) x (M+1)) =======================
 
+# --- Các hàm sinh tọa độ theo dạng phân bố -----------------------------------
+
+def _gen_coords_uniform(
+    m: int, coord_bound: int,
+) -> list[tuple[int, int]]:
+    """Phân bố Uniform Random: tọa độ ngẫu nhiên đều trong [-B, B]."""
+    B = coord_bound
+    coords: list[tuple[int, int]] = []
+    used: set[tuple[int, int]] = {(0, 0)}
+
+    for _ in range(m):
+        while True:
+            x = random.randint(-B, B)
+            y = random.randint(-B, B)
+            if (x, y) not in used:
+                coords.append((x, y))
+                used.add((x, y))
+                break
+    return coords
+
+
+def _gen_coords_corner_biased(
+    m: int, coord_bound: int,
+) -> list[tuple[int, int]]:
+    """
+    Phân bố Corner Biased: nodes tập trung ở 4 góc của không gian.
+    Mỗi node được gán ngẫu nhiên vào 1 trong 4 góc, rồi lệch trong
+    phạm vi ±30% coord_bound quanh góc đó.
+    """
+    B = coord_bound
+    corners = [(-B, -B), (-B, B), (B, -B), (B, B)]
+    spread = max(1, int(B * 0.3))
+
+    coords: list[tuple[int, int]] = []
+    used: set[tuple[int, int]] = {(0, 0)}
+
+    for _ in range(m):
+        while True:
+            cx, cy = random.choice(corners)
+            x = cx + random.randint(-spread, spread)
+            y = cy + random.randint(-spread, spread)
+            x = max(-B, min(B, x))
+            y = max(-B, min(B, y))
+            if (x, y) not in used:
+                coords.append((x, y))
+                used.add((x, y))
+                break
+    return coords
+
+
+def _gen_coords_clustered(
+    m: int, coord_bound: int,
+) -> list[tuple[int, int]]:
+    """
+    Phân bố Clustered: nodes chia thành K cụm (K tự động theo M).
+    Tâm cụm nằm trong 70% không gian, mỗi node lệch ±15% quanh tâm.
+    """
+    B = coord_bound
+    num_clusters = min(5, max(3, m // 30))
+
+    # Tâm cụm nằm trong vùng 70% để cụm không bị cắt bởi biên
+    inner = max(1, int(B * 0.7))
+    centers: list[tuple[int, int]] = [
+        (random.randint(-inner, inner), random.randint(-inner, inner))
+        for _ in range(num_clusters)
+    ]
+    spread = max(1, int(B * 0.15))
+
+    coords: list[tuple[int, int]] = []
+    used: set[tuple[int, int]] = {(0, 0)}
+
+    for _ in range(m):
+        while True:
+            cx, cy = random.choice(centers)
+            x = cx + random.randint(-spread, spread)
+            y = cy + random.randint(-spread, spread)
+            x = max(-B, min(B, x))
+            y = max(-B, min(B, y))
+            if (x, y) not in used:
+                coords.append((x, y))
+                used.add((x, y))
+                break
+    return coords
+
+
+def _gen_coords_diagonal(
+    m: int, coord_bound: int,
+) -> list[tuple[int, int]]:
+    """
+    Phân bố Diagonal: nodes phân bố dọc đường chéo chính (y ≈ x).
+    Mỗi node có vị trí t trên đường chéo, lệch vuông góc ±15% coord_bound.
+    """
+    B = coord_bound
+    noise = max(1, int(B * 0.15))
+
+    coords: list[tuple[int, int]] = []
+    used: set[tuple[int, int]] = {(0, 0)}
+
+    for _ in range(m):
+        while True:
+            t = random.randint(-B, B)
+            dx = random.randint(-noise, noise)
+            dy = random.randint(-noise, noise)
+            x = max(-B, min(B, t + dx))
+            y = max(-B, min(B, t + dy))
+            if (x, y) not in used:
+                coords.append((x, y))
+                used.add((x, y))
+                break
+    return coords
+
+
+# --- Hàm chính sinh ma trận khoảng cách --------------------------------------
+
 def step3_gen_distance_matrix(
     m: int,
     coord_bound: int,
+    distribution: str = "uniform",
 ) -> list[list[int]]:
     """
     Giai đoạn 3a — Sinh tọa độ:
@@ -142,26 +257,31 @@ def step3_gen_distance_matrix(
         Tọa độ trong [-coord_bound, coord_bound].
         Nếu điểm mới trùng với điểm đã sinh hoặc gốc tọa độ, sinh lại.
 
+        Dạng phân bố (distribution):
+          - "uniform"        : ngẫu nhiên đều (mặc định, giữ nguyên hành vi cũ)
+          - "corner_biased"  : tập trung ở 4 góc
+          - "clustered"      : chia thành K cụm
+          - "diagonal"       : dọc đường chéo chính (y ≈ x)
+
     Giai đoạn 3b — Tính khoảng cách:
         Khoảng cách Euclidean giữa mọi cặp điểm.
         Kết quả: ma trận đối xứng (M+1) x (M+1), đường chéo = 0.
         Khoảng cách được làm tròn lên số nguyên bằng math.ceil().
     """
-    coords: list[tuple[int, int]] = []
-    used: set[tuple[int, int]] = {(0, 0)}
-
-    for _ in range(m):
-        while True:
-            x = random.randint(-coord_bound, coord_bound)
-            y = random.randint(-coord_bound, coord_bound)
-            if (x, y) not in used:
-                coords.append((x, y))
-                used.add((x, y))
-                break
+    # Giai đoạn 3a: sinh tọa độ theo dạng phân bố
+    coord_generators = {
+        "uniform":       _gen_coords_uniform,
+        "corner_biased": _gen_coords_corner_biased,
+        "clustered":     _gen_coords_clustered,
+        "diagonal":      _gen_coords_diagonal,
+    }
+    gen_fn = coord_generators.get(distribution, _gen_coords_uniform)
+    coords = gen_fn(m, coord_bound)
 
     # all_points[0] = cửa kho (gốc); all_points[1..M] = kệ 1..M
     all_points: list[tuple[int, int]] = [(0, 0)] + coords
 
+    # Giai đoạn 3b: tính ma trận khoảng cách
     size = m + 1
     dist_matrix: list[list[int]] = [[0] * size for _ in range(size)]
 

@@ -132,7 +132,12 @@ Dừng khi đủ hàng hoặc không còn kệ có ích. Không có tham số tu
 
 ## 5. Dataset – Phân nhóm test cases
 
-Cả val_set và test_set đều có 30 file (cùng cấu trúc N/M, số liệu khác hoàn toàn).
+Cả val_set và test_set đều có **39 file** (cùng cấu trúc N/M, số liệu khác hoàn toàn).
+
+**Phân nhóm theo M** (M quyết định độ phức tạp tính toán):
+- **Small:** M ≤ 20
+- **Medium:** 50 ≤ M ≤ 400
+- **Large:** M ≥ 500
 
 | Nhóm | Số test | N/M | Mục đích |
 |---|---|---|---|
@@ -143,11 +148,19 @@ Cả val_set và test_set đều có 30 file (cùng cấu trúc N/M, số liệu
 | edge_infeas_25..26 | 2 | N=20..30, M=100..200 | Guaranteed infeasible |
 | edge_sparse_27..28 | 2 | N=40..50, M=800..1000 | 90% kệ trống |
 | edge_dense_29..30 | 2 | N=40..50, M=500..1000 | Kho đầy, nhu cầu nhỏ |
+| dist_corner_31..33 | 3 | N=15..50, M=150..800 | Tọa độ tập trung ở 4 góc |
+| dist_cluster_34..36 | 3 | N=15..50, M=150..800 | Tọa độ chia thành K cụm |
+| dist_diagonal_37..39 | 3 | N=15..50, M=150..800 | Tọa độ dọc đường chéo chính |
 
 **Cách batch_generator tạo edge cases:**
 - edge_sparse: Override 90% Q[i][j]=0, còn lại randint(1,5); sinh lại q với feasibility="Y"
 - edge_dense: Override Q[i][j]=randint(1000,5000); q=randint(10,20)
 - edge_infeas: feasibility="N" → q[i] > total_supply → guaranteed infeasible
+
+**Cách batch_generator tạo distribution cases:**
+- dist_corner: `step3_gen_distance_matrix(m, coord_bound, distribution="corner_biased")`
+- dist_cluster: `step3_gen_distance_matrix(m, coord_bound, distribution="clustered")`
+- dist_diagonal: `step3_gen_distance_matrix(m, coord_bound, distribution="diagonal")`
 
 ---
 
