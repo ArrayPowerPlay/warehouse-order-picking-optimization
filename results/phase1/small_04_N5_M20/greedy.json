@@ -1,0 +1,7 @@
+{
+    "route": [20, 9, 2, 8, 3, 16, 6, 4, 15, 19, 13],
+    "total_distance": 1229,
+    "t_best": 0.000469,
+    "time_limit": 900.0,
+    "hyperparameters": {}
+}

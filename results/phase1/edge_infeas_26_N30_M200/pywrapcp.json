@@ -1,0 +1,9 @@
+{
+    "route": [],
+    "total_distance": -1,
+    "t_best": -1.0,
+    "time_limit": 900.0,
+    "hyperparameters": {
+        "local_search_metaheuristic": "GUIDED_LOCAL_SEARCH"
+    }
+}
