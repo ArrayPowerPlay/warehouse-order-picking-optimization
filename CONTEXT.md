@@ -30,6 +30,17 @@ Nhân viên xuất phát từ **cửa kho (điểm 0)**, chọn một chuỗi k�
   Đây là edge case được thiết kế có chủ đích trong dataset.
 - Lời giải là **tập con có thứ tự** của các kệ, không phải hoán vị toàn bộ M kệ.
 
+### Contract chung cho mọi solver
+- Tất cả các thuật toán phải có **điều kiện dừng theo `time_limit`**.
+- Giá trị trả về chuẩn của solver là:
+  - `route`: thứ tự các kho/kệ hàng được thăm
+  - `total_distance`: độ dài quãng đường
+  - `t_best`: thời gian từ lúc bắt đầu chạy đến lúc tìm được nghiệm tốt nhất trong `time_limit`
+- Nếu input **vô nghiệm** thì quy ước trả về là:
+  - `route = []`
+  - `total_distance = -1`
+  - `t_best = -1`
+
 ---
 
 ## 2. Định dạng file dữ liệu (.in)
@@ -55,29 +66,36 @@ Dòng N+M+3      : N số nguyên q[1], q[2], ..., q[N]
 ```
 warehouse-order-picking-optimization/
 ├── data/
-│   ├── val_set/           (30 file .in: dùng để tune tham số – Grid Search)
-│   └── test_set/          (30 file .in: dùng để so sánh cuối cùng – fair comparison)
+│   ├── val_set/           (39 file .in: dùng để tune tham số – Grid Search)
+│   └── test_set/          (39 file .in: dùng để so sánh cuối cùng – fair comparison)
+├── config/
+│   └── settings.py            (cấu hình hệ thống: TIME_LIMIT_TESTING, runs)
 ├── src/
 │   ├── generators/
 │   │   ├── data_generator.py       (sinh 1 file .in qua CLI tương tác)
 │   │   ├── batch_generator.py      (sinh toàn bộ val_set + test_set theo recipe)
 │   │   └── DATA_GENERATOR_NOTE.md  (tài liệu chi tiết về data_generator v2.0.0)
 │   └── solvers/
-│       ├── utils.py                    (read_input, evaluator, validator)
-│       ├── settings.py                 (cấu hình hệ thống: time_limit, runs)
-│       ├── greedy.py                   (Greedy heuristic)
-│       ├── greedy_pruning_pywrapcp.py  (Greedy + Pruning + GLS)
-│       ├── simulated_annealing.py      (Simulated Annealing)
-│       ├── genetic_algorithm.py        (Genetic Algorithm – TODO)
-│       └── OR_Tools_cp_sat.py          (Exact solver CP-SAT)
+│       ├── utils.py                          (read_input, evaluator, validator)
+│       ├── greedy.py                         (Greedy heuristic)
+│       ├── greedy_pruning_pywrapcp.py        (Greedy + Pruning + GLS)
+│       ├── genetic_algorithm.py              (Genetic Algorithm – TODO)
+│       ├── OR_Tools_cp_sat.py                (Exact solver CP-SAT)
+│       └── simulated_annealing/
+│           ├── adaptive_simulated_annealing.py  (Adaptive Simulated Annealing)
+│           ├── phase1.py                        (Batch runner cho Phase 1 của ASA)
+│           └── ALGORITHM_DESCRIPTION.md         (Mô tả chi tiết thuật toán ASA)
 ├── notebooks/
 │   ├── tuning/
 │   │   ├── simulated_annealing_tuning.ipynb
 │   │   └── genetic_algorithm_tuning.ipynb
 │   └── final_evaluation.ipynb
 ├── results/
-│   ├── val_results/    (kết quả Grid Search từng thuật toán)
-│   └── test_results/   (kết quả so sánh cuối cùng)
+│   ├── phase1/         (kết quả representative long-run để chọn time limit chuẩn)
+│   ├── phase2/         (cost reference cho val_set)
+│   ├── phase3/         (kết quả tuning hyperparameter)
+│   ├── phase4/         (cost reference cho test_set)
+│   └── phase5/         (kết quả đánh giá cuối cùng)
 ├── requirements.txt
 ├── README.md
 └── context.md          (file này)
@@ -104,13 +122,13 @@ Dừng khi đủ hàng hoặc không còn kệ có ích. Không có tham số tu
 2. Pruning (duyệt ngược) → loại kệ thừa không ảnh hưởng khả thi
 3. OR-Tools pywrapcp (Guided Local Search) → tối ưu thứ tự kệ đã chọn
 
-**Tham số tune:** Dừng theo `time_limit` trong `settings.py`.
+**Tham số tune:** Dừng theo `time_limit`; khi chạy Phase 1 dùng `TIME_LIMIT_TESTING` trong `config/settings.py`.
 
 ### 4.3 Adaptive Simulated Annealing (adaptive_simulated_annealing.py)
 **Loại:** Metaheuristic (Nâng cấp từ SA gốc)
 **Biểu diễn nghiệm:** Hoán vị đầy đủ M kệ. `evaluate_route()` chuyển permutation → route.
 **Hàm lân cận (ALNS):** Swap, Insert, 2-Opt với cơ chế cập nhật trọng số động.
-**Điều kiện dừng:** Dựa trên `time_limit` tương ứng với quy mô bài toán trong `settings.py`.
+**Điều kiện dừng:** Dựa trên `time_limit`; riêng Phase 1 lấy giá trị từ `TIME_LIMIT_TESTING` theo kích thước testcase.
 
 **Tham số tune (val_set):**
 | Tham số | Ý nghĩa | Mặc định tune |
@@ -126,7 +144,7 @@ Dừng khi đủ hàng hoặc không còn kệ có ích. Không có tham số tu
 **Loại:** Exact Solver
 **Mô hình:** Biến nhị phân x[j] + arc[i][j] + AddCircuit → chu trình Hamiltonian.
 **Ràng buộc:** Σ_j Q[i][j]*x[j] >= q[i] với mọi i.
-**Tham số:** max_time_in_seconds = theo `time_limit` trong `settings.py`.
+**Tham số:** max_time_in_seconds = theo `time_limit` được truyền cho solver.
 
 ---
 
@@ -170,20 +188,54 @@ Cả val_set và test_set đều có **39 file** (cùng cấu trúc N/M, số li
 batch_generator.py
   → sinh val_set/ và test_set/
       ↓
-PHASE 1: TUNING (val_set)
-  notebooks/tuning/*.ipynb
-  - Xác định cost_reference:
-      + Nhóm small: Dạy CP-SAT lấy nghiệm tối ưu tuyệt đối.
-      + Nhóm medium & large: Chạy TẤT CẢ cấu hình của các thuật toán trong time_limit, lấy kết quả tốt nhất làm reference.
-      + LƯU Ý: Cần viết một script/notebook (vd: `generate_cost_reference.ipynb`) chạy quét toàn bộ `val_set` và lưu bảng `cost_reference` ra file CSV hoặc JSON. Dữ liệu này sẽ dùng làm chuẩn (baseline) để tính RPD cho quá trình tuning sau này.
-  - Chạy Grid Search: Mỗi cấu hình chạy `NUM_RUNS_PER_CONFIG = 5` lần (với các seed khác nhau).
-  - Đánh giá bằng RPD (Relative Percentage Deviation).
-  → Lưu kết quả vào results/val_results/
+PHASE 1: TÌM TIME LIMIT CHUẨN
+  - Chọn representative cases từ các folder hiện có trong results/phase1/
+  - Chạy mỗi thuật toán với cấu hình siêu tham số mặc định trên các testcase đại diện này
+  - Dùng TIME_LIMIT_TESTING theo kích thước testcase:
+      + small: M <= 20
+      + medium: 50 <= M <= 400
+      + large: M >= 500
+  - Quan sát điểm bão hòa để chốt time budget hợp lý cho từng nhóm testcase
+  - Output mỗi thuật toán trên mỗi testcase:
+      + results/phase1/<testcase>/<algorithm>.json
+      + các field gồm: route, total_distance, t_best, time_limit, hyperparameters
+      + nếu thuật toán không có hyperparameter thì hyperparameters = {}
+      + ASA dùng src/solvers/simulated_annealing/phase1.py để sinh asa.json
+      ↓
+PHASE 2: FIND BEST KNOWN SOLUTION (BFS) CHO val_set
+  - Mục đích: tạo cost reference cho toàn bộ val_set
+  - Với small case: dùng nghiệm của OR-Tools CP-SAT làm cost reference
+  - Với testcase còn lại: chạy tất cả cấu hình của tất cả thuật toán để lấy BFS_Cost
+  - Với thuật toán ngẫu nhiên: mỗi cấu hình chạy k = 10 seed (0..9), chỉ giữ kết quả tốt nhất
+  - Output lưu dưới dạng file ở results/phase2/
+      ↓
+PHASE 3: HYPERPARAMETER TUNING (val_set)
+  - Xét từng cấu hình trong lưới siêu tham số của từng thuật toán có tune
+  - Nếu thuật toán ngẫu nhiên: mỗi cấu hình chạy k = 10 seed (0..9) trên mỗi testcase
+  - Tính min_cost cho từng testcase
+  - Dùng cost reference từ Phase 2 để tính RFD
+  - Tính avg_RFD trên toàn bộ val_set
+  - Chọn cấu hình có avg_RFD nhỏ nhất
+  - Output lưu tại results/phase3/<algorithm>.csv
       ↓ bộ tham số tốt nhất
-PHASE 2: FINAL EVAL (test_set)
-  notebooks/final_evaluation.ipynb
-  → So sánh công bằng tất cả thuật toán
-  → Lưu vào results/test_results/
+PHASE 4: FIND BEST KNOWN SOLUTION (BFS) CHO test_set
+  - Tạo cost reference cho toàn bộ test_set
+  - Với small case: dùng nghiệm của OR-Tools CP-SAT
+  - Với testcase còn lại: chạy tất cả cấu hình của tất cả thuật toán
+  - Với thuật toán ngẫu nhiên: mỗi cấu hình chạy k = 10 seed (0..9), chỉ giữ kết quả tốt nhất
+  - Output lưu tại results/phase4/
+      ↓
+PHASE 5: FINAL EVALUATION
+  - Chạy từng thuật toán với cấu hình tốt nhất đã chọn ở Phase 3 trên test_set
+  - Với thuật toán ngẫu nhiên: mỗi testcase chạy k = 10 seed (0..9)
+  - Tính các metric:
+      + min_cost, max_cost, avg_cost, std_cost
+      + avg_t_best
+      + RFD cho từng testcase
+      + avg_RFD theo nhóm testcase và overall
+  - Output:
+      + results/phase5/evaluation_details.csv
+      + results/phase5/summary.csv
 ```
 
 ---
@@ -216,8 +268,9 @@ Kiểm tra tính hợp lệ của input data.
 ```bash
 # Chạy solver độc lập (từ src/solvers/)
 python greedy.py < ../../data/val_set/small_01_N2_M5.in
-python simulated_annealing.py < ../../data/val_set/medium_06_N10_M50.in
+python simulated_annealing/adaptive_simulated_annealing.py < ../../data/val_set/medium_06_N10_M50.in
 python OR_Tools_cp_sat.py < ../../data/val_set/small_01_N2_M5.in
+python simulated_annealing/phase1.py
 
 # Sinh dữ liệu (từ src/generators/)
 python data_generator.py     # CLI tương tác
@@ -256,15 +309,16 @@ Python >= 3.11
 | batch_generator.py | ✅ Hoàn thiện |
 | greedy.py | ✅ Implement xong |
 | greedy_pruning_pywrapcp.py | ✅ Implement xong |
-| simulated_annealing.py (ASA) | ✅ Implement xong |
+| adaptive_simulated_annealing.py (ASA) | ✅ Implement xong |
+| simulated_annealing/phase1.py | ✅ Implement xong |
 | genetic_algorithm.py | ❌ Chưa implement |
 | OR_Tools_cp_sat.py | ✅ Implement xong (exact solver) |
 | utils.py (evaluator, validator) | ✅ Implement xong |
-| Script/Notebook sinh cost_reference | ⬜ Chưa implement (TODO) |
-| Notebook SA tuning | ⬜ Chưa điền code |
-| Notebook GA tuning | ⬜ Chưa điền code |
-| Notebook final evaluation | ⬜ Chưa điền code |
+| Phase 2 cost reference script | ⬜ Chưa implement (TODO) |
+| Phase 3 tuning script/notebook | ⬜ Chưa điền code |
+| Phase 4 cost reference script | ⬜ Chưa implement (TODO) |
+| Phase 5 final evaluation script/notebook | ⬜ Chưa điền code |
 
 ---
 
-*Cập nhật lần cuối: 2026-04-11*
+*Cập nhật lần cuối: 2026-05-16*
