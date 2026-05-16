@@ -1,0 +1,13 @@
+{
+    "route": [666],
+    "total_distance": 672,
+    "t_best": 0.1452,
+    "time_limit": 900.0,
+    "hyperparameters": {
+        "NUM_ANTS": 100,
+        "MAX_ITER": 8095,
+        "ALPHA": 1.0,
+        "BETA": 3.0,
+        "RHO": 0.1
+    }
+}
