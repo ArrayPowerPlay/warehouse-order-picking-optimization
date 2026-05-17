@@ -6,8 +6,7 @@ default hyperparameters on the matching files in data/val_set, and writes
 results/phase1/<testcase>/asa.json.
 """
 
-from __future__ import annotations
-
+from __future__ import annotations  # This prevents type annotations from being evaluated immediately
 import json
 import os
 import sys
@@ -33,6 +32,7 @@ VAL_SET_ROOT = os.path.join(project_root, "data", "val_set")
 
 
 def classify_testcase_size(m: int) -> str:
+    """Classify testcase's size into small, medium, and large."""
     if m <= 20:
         return "small"
     if 50 <= m <= 400:
@@ -43,6 +43,7 @@ def classify_testcase_size(m: int) -> str:
 
 
 def get_representative_testcases() -> list[str]:
+    """Get all representative testcases used for determine TIME_LIMIT from results/phase1."""
     if not os.path.isdir(REPRESENTATIVE_ROOT):
         raise FileNotFoundError(f"Representative root not found: {REPRESENTATIVE_ROOT}")
 
@@ -58,6 +59,7 @@ def get_representative_testcases() -> list[str]:
 
 
 def get_testcase_info(testcase_name: str) -> tuple[str, str, float]:
+    """From a testcase's name, return its path, classified size, and time limit used for running."""
     input_path = os.path.join(VAL_SET_ROOT, f"{testcase_name}.in")
     if not os.path.isfile(input_path):
         raise FileNotFoundError(
@@ -73,6 +75,7 @@ def get_testcase_info(testcase_name: str) -> tuple[str, str, float]:
 
 
 def build_result_payload(route: list[int], total_distance: int, t_best: float, time_limit: float) -> dict:
+    """Build payload to save running's result as a JSON files."""
     return {
         "route": route,
         "total_distance": total_distance,
@@ -87,6 +90,7 @@ def build_result_payload(route: list[int], total_distance: int, t_best: float, t
 
 
 def run_single_testcase(testcase_name: str) -> dict:
+    """Run a testcase and save result into 'results/phase1/testcase_name'."""
     input_path, _, time_limit = get_testcase_info(testcase_name)
 
     with open(input_path, encoding="utf-8") as stream:

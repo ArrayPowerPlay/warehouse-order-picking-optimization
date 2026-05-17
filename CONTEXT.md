@@ -1,6 +1,6 @@
-# context.md — Warehouse Order Picking Optimization
+# CONTEXT.md — Warehouse Order Picking Optimization
 
-> File này tổng hợp toàn bộ thông tin về project. Đọc file này trước khi làm việc với bất kỳ phần nào của codebase.
+> File này tổng hợp toàn bộ thông tin về project. Đọc file này trước khi làm việc với bất kỳ phần nào của codebase. Mỗi khi cập nhật 1 thông tin quan trọng cần cho lần đọc tiếp theo, tự động cập nhật file này.
 
 ---
 
@@ -52,9 +52,9 @@ Dòng N+2..N+M+2 : (M+1) hàng của ma trận khoảng cách d  ((M+1) x (M+1) 
 Dòng N+M+3      : N số nguyên q[1], q[2], ..., q[N]
 ```
 
-**Quy ước index trong code (1-based):**
+**Quy ước index trong code (mixed indexing):**
 - `Q[i][j]`: i=1..N (sản phẩm), j=1..M (kệ) — Q[0] và Q[i][0] là hàng/cột giả
-- `d[i][j]`: i,j=0..M — d[0] là cửa kho (point 0)
+- `d[i][j]`: i,j=0..M — `d[0]` là cửa kho (point 0), `d[1..M]` là các kệ
 - `q[i]`: i=1..N — q[0] là phần tử giả
 
 **Ví dụ tên file:** `medium_06_N10_M50.in`, `edge_sparse_27_N40_M800.in`
@@ -141,10 +141,11 @@ Dừng khi đủ hàng hoặc không còn kệ có ích. Không có tham số tu
 **Loại:** Metaheuristic | **Trạng thái: TODO – chưa implement**
 
 ### 4.5 OR-Tools CP-SAT (OR_Tools_cp_sat.py)
-**Loại:** Exact Solver
+**Loại:** Solver dựa trên mô hình exact (CP-SAT)
 **Mô hình:** Biến nhị phân x[j] + arc[i][j] + AddCircuit → chu trình Hamiltonian.
 **Ràng buộc:** Σ_j Q[i][j]*x[j] >= q[i] với mọi i.
 **Tham số:** max_time_in_seconds = theo `time_limit` được truyền cho solver.
+**Lưu ý:** Vì implementation hiện tại vẫn chạy với time limit, CP-SAT có thể trả về nghiệm `FEASIBLE` trước khi chứng minh tối ưu. Do đó không phải mọi lần chạy đều là nghiệm tối ưu tuyệt đối.
 
 ---
 

@@ -1,1 +1,0 @@
-# Cài đặt giải thuật di truyền

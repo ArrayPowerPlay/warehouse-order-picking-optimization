@@ -1,0 +1,13 @@
+{
+    "route": [
+        616
+    ],
+    "total_distance": 1430,
+    "t_best": 20.00153110001702,
+    "time_limit": 900.0,
+    "hyperparameters": {
+        "alpha": 0.995,
+        "max_no_improve": 1000,
+        "reheat_ratio": 0.3
+    }
+}

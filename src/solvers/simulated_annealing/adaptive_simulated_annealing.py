@@ -12,7 +12,7 @@ import random
 import sys
 import time
 
-# Add project root to sys.path.
+# Add project root to sys.path
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../.."))
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
@@ -49,6 +49,8 @@ def asa_solver(
     deadline = algorithm_start + max(0.0, time_limit)
 
     def evaluate_route(permutation_of_shelves: list[int]) -> tuple[int, list[int]]:
+        """From the permutation of shelves, return the cost and the actual route needed
+        to complete orders from customers."""
         remaining_order = q[:]
         fulfilled_count = 0
 
@@ -73,7 +75,9 @@ def asa_solver(
 
         return compute_route_distance(route, d), route
 
+    ### Implement some ALNS operators
     def op_swap(state: list[int]) -> list[int]:
+        """Swap 2 elements in a route."""
         neighbor = state[:]
         if M < 2:
             return neighbor
@@ -82,6 +86,7 @@ def asa_solver(
         return neighbor
 
     def op_insert(state: list[int]) -> list[int]:
+        """Insert the first element right immediately before the second element."""
         neighbor = state[:]
         if M < 2:
             return neighbor
@@ -91,6 +96,7 @@ def asa_solver(
         return neighbor
 
     def op_2opt(state: list[int]) -> list[int]:
+        """Reverse a sub route."""
         neighbor = state[:]
         if M < 2:
             return neighbor
@@ -106,6 +112,7 @@ def asa_solver(
     epoch_length = 100
     grace_period_epochs = 2
 
+    ### Initialize initial state
     current_state = list(range(1, M + 1))
     random.shuffle(current_state)
     current_cost, current_route = evaluate_route(current_state)
@@ -115,6 +122,7 @@ def asa_solver(
     best_route = current_route[:]
     t_best = time.perf_counter() - algorithm_start
 
+    ### Find t_start
     deltas = []
     while len(deltas) < 100 and time.perf_counter() < deadline:
         operator = random.choice(operators)
@@ -124,17 +132,18 @@ def asa_solver(
             deltas.append(neighbor_cost - current_cost)
 
     delta_avg = (sum(deltas) / len(deltas)) if deltas else 10.0
+
     t_start = -delta_avg / math.log(0.8)
     if t_start <= 0:
         t_start = 100.0
     temperature = t_start
 
-    no_improve_cnt = 0
+    no_improve_cnt = 0      # Number of iterations that the state does not change
     grace_period = 0
-    epoch_iter = 0
+    epoch_iter = 0          # Track epoch
     epoch_accepted = 0
-    op_scores = [0, 0, 0]
-    op_counts = [0, 0, 0]
+    op_scores = [0, 0, 0]   # Scores per ALNS operators
+    op_counts = [0, 0, 0]   # Number of times an operators being used in an epoch
 
     while time.perf_counter() < deadline:
         total_weight = sum(weights)
@@ -209,11 +218,12 @@ def asa_solver(
 
         if no_improve_cnt >= max_no_improve:
             no_improve_cnt = 0
-            temperature = t_start * reheat_ratio
+            temperature = t_start * reheat_ratio  # Stucked -> Warm up to increase temperature
             grace_period = grace_period_epochs
 
+            # Break best_state to jump out of local optimum
             current_state = best_state[:]
-            num_swaps = max(1, M // 10)
+            num_swaps = max(1, M // 10)  # Randomly mix 10% of current state
             for _ in range(num_swaps):
                 if M < 2:
                     break
