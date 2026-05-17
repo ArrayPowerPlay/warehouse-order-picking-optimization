@@ -91,11 +91,12 @@ Toàn bộ thuật toán dừng theo `deadline`, không theo số vòng lặp c�
 - tạo `current_state = list(range(1, M + 1))`
 - xáo trộn ngẫu nhiên bằng `random.shuffle(current_state)`
 - đánh giá trạng thái ban đầu bằng `evaluate_route()`
+- chạy thêm `polish_route()` trên route ban đầu để lấy nghiệm report đầu tiên
 
 Sau đó:
 - `best_state = current_state[:]`
-- `best_cost = current_cost`
-- `best_route = current_route[:]`
+- `best_cost = current_report_cost`
+- `best_route = current_report_route[:]`
 - `t_best` được gán bằng thời gian từ lúc bắt đầu đến thời điểm có nghiệm ban đầu
 
 ### Bước 4. Warm-up để ước lượng nhiệt độ khởi đầu `T_start`
@@ -134,20 +135,36 @@ Trong khi `time.perf_counter() < deadline`, thuật toán:
 Đây là phần chuyển từ một hoán vị đầy đủ sang nghiệm thực sự của bài toán.
 
 Luồng đánh giá:
-1. copy nhu cầu còn thiếu sang `remaining_order`
-2. duyệt lần lượt từng kệ trong permutation
-3. với mỗi kệ, lấy tối đa phần còn thiếu của từng sản phẩm
-4. sau mỗi kệ, kiểm tra đã đủ hàng chưa
-5. nếu đã đủ thì dừng ngay, không cần đi hết permutation
-6. tính quãng đường của prefix bằng `compute_route_distance(route, d)`
+1. `extract_route()` copy nhu cầu còn thiếu sang `remaining_order`
+2. tạo `active_items` chỉ chứa các sản phẩm vẫn còn thiếu
+3. duyệt lần lượt từng kệ trong permutation
+4. với mỗi kệ, chỉ cập nhật các sản phẩm trong `active_items`
+5. nếu một sản phẩm vừa đủ, loại nó khỏi vùng active bằng cách swap-compact tại chỗ
+6. khi không còn sản phẩm thiếu (`active_count == 0`) thì dừng ngay
+7. `evaluate_route()` tính quãng đường của prefix bằng `compute_route_distance(route, d)`
 
 Hệ quả quan trọng:
 - phần đầu của permutation có ảnh hưởng mạnh hơn phần cuối
 - nhiều biến đổi ở suffix có thể không thay đổi `route` thực tế nếu nhu cầu đã được thỏa mãn từ trước
+- implementation hiện tại giảm chi phí đánh giá bằng cách không quét lại các sản phẩm đã đủ
 
 ---
 
-## 5. Các toán tử lân cận
+## 5. Hàm `polish_route()`
+
+`polish_route()` không thay đổi tập kệ đã chọn, mà chỉ sắp lại thứ tự ghé thăm:
+- bước 1: dựng lại route bằng `Nearest Neighbor`
+- bước 2: chạy `2-opt` tối đa `MAX_2OPT_PASSES = 1`
+
+Mục tiêu của hàm này là lấy cùng tập kệ nhưng tạo route ngắn hơn để báo cáo `best_route`.
+
+Lưu ý:
+- `polish_route()` **không** được gọi cho mọi accepted state
+- code hiện tại chỉ gọi `polish_route()` khi `neighbor_cost < current_cost`, tức raw neighbor thực sự cải thiện nghiệm hiện tại
+
+---
+
+## 6. Các toán tử lân cận
 
 Hiện tại solver dùng 3 operator:
 
@@ -185,7 +202,7 @@ Lưu ý:
 
 ---
 
-## 6. Cơ chế chấp nhận nghiệm của SA
+## 7. Cơ chế chấp nhận nghiệm của SA
 
 Sau khi có `neighbor_cost`, thuật toán tính:
 ```python
@@ -193,11 +210,16 @@ delta_e = neighbor_cost - current_cost
 ```
 
 ### Nếu `delta_e < 0`
-Nghiệm mới tốt hơn nên được chấp nhận luôn.
+Nghiệm raw mới tốt hơn nên được chấp nhận luôn.
 
-Điểm thưởng cho operator:
-- `5` nếu đây là nghiệm tốt nhất mới toàn cục
-- `2` nếu chỉ tốt hơn nghiệm hiện tại nhưng chưa vượt `best_cost`
+Sau khi accept:
+- cập nhật `current_state`, `current_cost`, `current_route`
+- chạy `polish_route(current_route)`
+- nếu polished cost tốt hơn `best_cost` thì:
+  - cập nhật nghiệm report tốt nhất
+  - operator nhận điểm `5`
+- nếu raw neighbor tốt hơn current nhưng polished cost chưa vượt `best_cost` thì:
+  - operator nhận điểm `2`
 
 ### Nếu `delta_e >= 0`
 Nghiệm mới xấu hơn hoặc bằng, thuật toán vẫn có thể chấp nhận theo xác suất:
@@ -207,6 +229,7 @@ p = exp(-delta_e / T)
 
 Nếu được chấp nhận:
 - operator nhận điểm `1`
+- không chạy `polish_route()`
 
 Nếu bị từ chối:
 - operator nhận điểm `0`
@@ -217,7 +240,7 @@ Nếu bị từ chối:
 
 ---
 
-## 7. Cập nhật trọng số operator theo epoch
+## 8. Cập nhật trọng số operator theo epoch
 
 Thuật toán gom thống kê theo từng epoch:
 - `epoch_length = 100`
@@ -243,7 +266,7 @@ Sau mỗi epoch, các biến thống kê được reset về 0.
 
 ---
 
-## 8. Adaptive Cooling hiện tại
+## 9. Adaptive Cooling hiện tại
 
 Sau mỗi epoch, thuật toán tính:
 ```python
@@ -267,7 +290,7 @@ Các giá trị như `0.5`, `0.05`, `0.9`, `1.1` hiện là **heuristic hard-cod
 
 ---
 
-## 9. Re-annealing khi bị kẹt
+## 10. Re-annealing khi bị kẹt
 
 Thuật toán theo dõi:
 - `no_improve_cnt`: số bước liên tiếp không tạo ra `best_cost` mới
@@ -310,7 +333,7 @@ Mục đích của đoạn này:
 
 ---
 
-## 10. Ý nghĩa của `t_best`
+## 11. Ý nghĩa của `t_best`
 
 `t_best` là một chỉ số quan trọng cho thực nghiệm, vì nó cho biết:
 - thuật toán cần bao lâu để tìm ra nghiệm tốt nhất mà nó đạt được trong `time_limit`
@@ -318,9 +341,9 @@ Mục đích của đoạn này:
 Không phải lúc nào nghiệm tốt nhất cũng xuất hiện ở cuối thời gian chạy.
 
 Trong code hiện tại:
-- `t_best` được khởi tạo sau khi có nghiệm ban đầu
-- mỗi lần `current_cost < best_cost`, `t_best` được cập nhật
-- giá trị cuối cùng phản ánh thời điểm phát hiện nghiệm tốt nhất cuối cùng
+- `t_best` được khởi tạo sau khi có nghiệm report ban đầu
+- mỗi lần polished cost tốt hơn `best_cost`, `t_best` được cập nhật
+- giá trị cuối cùng phản ánh thời điểm phát hiện nghiệm report tốt nhất cuối cùng
 
 Điều này hữu ích khi so sánh:
 - chất lượng nghiệm
@@ -329,7 +352,7 @@ Trong code hiện tại:
 
 ---
 
-## 11. Lưu ý về implementation hiện tại
+## 12. Lưu ý về implementation hiện tại
 
 Tài liệu này mô tả đúng theo code hiện có trong `adaptive_simulated_annealing.py`, không khẳng định rằng mọi lựa chọn heuristic đều là tối ưu.
 

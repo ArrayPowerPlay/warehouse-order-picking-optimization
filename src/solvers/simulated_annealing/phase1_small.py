@@ -41,8 +41,7 @@ OUTPUT_PATH = os.path.join(
 )
 
 # Edit this list directly if you want a fixed sweep in code.
-TIME_LIMIT_CANDIDATES = [100, 200, 300]
-
+TIME_LIMIT_CANDIDATES = [20]
 
 def build_result_payload(route: list[int], total_distance: int, t_best: float, time_limit: float) -> dict:
     return {

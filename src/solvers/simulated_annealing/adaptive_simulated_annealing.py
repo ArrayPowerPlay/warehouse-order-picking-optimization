@@ -4,7 +4,6 @@ Adaptive Simulated Annealing (ASA) for Warehouse Order Picking Optimization.
 The solver stops by time limit and returns:
     route, total_distance, t_best
 """
-
 import argparse
 import math
 import os
@@ -25,6 +24,8 @@ DEFAULT_ALPHA = 0.995
 DEFAULT_MAX_NO_IMPROVE = 1000
 DEFAULT_REHEAT_RATIO = 0.3
 DEFAULT_SEED = 42
+MAX_2OPT_PASSES = 1
+MIN_TEMPERATURE = 1e-4
 
 
 def asa_solver(
@@ -48,31 +49,105 @@ def asa_solver(
     algorithm_start = time.perf_counter()
     deadline = algorithm_start + max(0.0, time_limit)
 
-    def evaluate_route(permutation_of_shelves: list[int]) -> tuple[int, list[int]]:
-        """From the permutation of shelves, return the cost and the actual route needed
-        to complete orders from customers."""
+    def extract_route(permutation_of_shelves: list[int]) -> list[int]:
+        """Extract the first prefix that satisfies the order."""
         remaining_order = q[:]
-        fulfilled_count = 0
-
-        for item_idx in range(1, N + 1):
-            if remaining_order[item_idx] <= 0:
-                fulfilled_count += 1
-
-        if fulfilled_count == N:
-            return 0, []
+        active_items = [item_idx for item_idx in range(1, N + 1) if remaining_order[item_idx] > 0]
+        active_count = len(active_items)
+        if active_count == 0:
+            return []
 
         route = []
+        route_append = route.append
+        Q_local = Q
+
         for shelf_idx in permutation_of_shelves:
-            route.append(shelf_idx)
-            for item_idx in range(1, N + 1):
-                if remaining_order[item_idx] > 0:
-                    fulfilled_amount = min(remaining_order[item_idx], Q[item_idx][shelf_idx])
-                    remaining_order[item_idx] -= fulfilled_amount
-                    if remaining_order[item_idx] <= 0:
-                        fulfilled_count += 1
-            if fulfilled_count == N:
+            route_append(shelf_idx)
+
+            pos = 0
+            while pos < active_count:
+                item_idx = active_items[pos]
+                available_amount = Q_local[item_idx][shelf_idx]
+                if available_amount <= 0:
+                    pos += 1
+                    continue
+
+                remaining_need = remaining_order[item_idx]
+                if available_amount >= remaining_need:
+                    remaining_order[item_idx] = 0
+                    active_count -= 1
+                    active_items[pos], active_items[active_count] = (
+                        active_items[active_count],
+                        active_items[pos],
+                    )
+                else:
+                    remaining_order[item_idx] = remaining_need - available_amount
+                    pos += 1
+
+            if active_count == 0:
                 break
 
+        return route
+
+    def polish_route(route: list[int]) -> tuple[int, list[int]]:
+        """Reorder the selected shelves with nearest-neighbor, then improve with 2-opt."""
+        route_len = len(route)
+        if route_len < 2:
+            return compute_route_distance(route, d), route[:]
+
+        dist = d
+        candidate_order = list(set(route))
+        visited = [False] * (M + 1)
+        polished_route = []
+        current_node = 0
+        route_distance = 0
+
+        for _ in range(route_len):
+            next_node = -1
+            best_distance = 0
+
+            for shelf_idx in candidate_order:
+                if visited[shelf_idx]:
+                    continue
+
+                candidate_distance = dist[current_node][shelf_idx]
+                if next_node == -1 or candidate_distance < best_distance:
+                    next_node = shelf_idx
+                    best_distance = candidate_distance
+
+            visited[next_node] = True
+            polished_route.append(next_node)
+            route_distance += best_distance
+            current_node = next_node
+
+        route_distance += dist[current_node][0]
+
+        for _ in range(MAX_2OPT_PASSES):
+            improved = False
+            ### Implement 2-opt for optimization, reverse a subset from node_b to node_c (included)
+            for start_idx in range(route_len - 1):
+                for end_idx in range(start_idx + 2, route_len + 1):
+                    node_a = 0 if start_idx == 0 else polished_route[start_idx - 1]
+                    node_b = polished_route[start_idx]
+                    node_c = polished_route[end_idx - 1]
+                    node_d = 0 if end_idx == route_len else polished_route[end_idx]
+
+                    current_edges = dist[node_a][node_b] + dist[node_c][node_d]
+                    swapped_edges = dist[node_a][node_c] + dist[node_b][node_d]
+                    # Only apply 2-opt if distance decreases
+                    if swapped_edges < current_edges:
+                        polished_route[start_idx: end_idx] = reversed(polished_route[start_idx: end_idx])
+                        route_distance += swapped_edges - current_edges
+                        improved = True
+
+            if not improved:
+                break        # Stop early
+
+        return route_distance, polished_route
+
+    def evaluate_route(permutation_of_shelves: list[int]) -> tuple[int, list[int]]:
+        """Evaluate the raw prefix extracted from the permutation."""
+        route = extract_route(permutation_of_shelves)
         return compute_route_distance(route, d), route
 
     ### Implement some ALNS operators
@@ -101,7 +176,7 @@ def asa_solver(
         if M < 2:
             return neighbor
         pos1, pos2 = sorted(random.sample(range(M), 2))
-        neighbor[pos1:pos2] = reversed(neighbor[pos1:pos2])
+        neighbor[pos1: pos2] = reversed(neighbor[pos1: pos2])
         return neighbor
 
     operators = [op_swap, op_2opt, op_insert]
@@ -116,10 +191,11 @@ def asa_solver(
     current_state = list(range(1, M + 1))
     random.shuffle(current_state)
     current_cost, current_route = evaluate_route(current_state)
+    current_report_cost, current_report_route = polish_route(current_route)
 
     best_state = current_state[:]
-    best_cost = current_cost
-    best_route = current_route[:]
+    best_cost = current_report_cost
+    best_route = current_report_route[:]
     t_best = time.perf_counter() - algorithm_start
 
     ### Find t_start
@@ -162,18 +238,15 @@ def asa_solver(
         delta_e = neighbor_cost - current_cost
         accepted = False
         score_for_op = 0
+        improved_current = delta_e < 0
 
-        if delta_e < 0:
+        if improved_current:
             accepted = True
-            score_for_op = 5 if neighbor_cost < best_cost else 2
         else:
-            acceptance_prob = math.exp(-delta_e / temperature) if temperature > 0.0001 else 0.0
+            acceptance_prob = math.exp(-delta_e / temperature) if temperature > MIN_TEMPERATURE else 0.0
             if random.random() < acceptance_prob:
                 accepted = True
                 score_for_op = 1
-
-        op_counts[op_idx] += 1
-        op_scores[op_idx] += score_for_op
 
         if accepted:
             current_state = neighbor_state
@@ -181,16 +254,25 @@ def asa_solver(
             current_route = neighbor_route
             epoch_accepted += 1
 
-            if current_cost < best_cost:
-                best_cost = current_cost
-                best_route = current_route[:]
-                best_state = current_state[:]
-                t_best = time.perf_counter() - algorithm_start
-                no_improve_cnt = 0
+            if improved_current:
+                current_report_cost, current_report_route = polish_route(current_route)
+                if current_report_cost < best_cost:
+                    score_for_op = 5
+                    best_cost = current_report_cost
+                    best_route = current_report_route[:]
+                    best_state = current_state[:]
+                    t_best = time.perf_counter() - algorithm_start
+                    no_improve_cnt = 0
+                else:
+                    score_for_op = 2
+                    no_improve_cnt += 1
             else:
                 no_improve_cnt += 1
         else:
             no_improve_cnt += 1
+
+        op_counts[op_idx] += 1
+        op_scores[op_idx] += score_for_op
 
         epoch_iter += 1
 
