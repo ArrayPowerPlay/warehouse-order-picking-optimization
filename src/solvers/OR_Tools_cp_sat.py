@@ -1,9 +1,11 @@
 import sys
 from ortools.sat.python import cp_model
 
-def solve():
-    input_data = sys.stdin.read().split()
-    if not input_data: return
+def solve_or_tools_cp_sat(input_file, time_limit):
+    with open(input_file, 'r') as f:
+        input_data = f.read().split()
+    
+    if not input_data: return None
     iterator = iter(input_data)
     N = int(next(iterator))
     M = int(next(iterator))
@@ -62,7 +64,7 @@ def solve():
     model.Minimize(total_distance)
 
     solver = cp_model.CpSolver()
-    solver.parameters.max_time_in_seconds = 2.0
+    solver.parameters.max_time_in_seconds = time_limit
     status = solver.Solve(model)
 
     if status == cp_model.OPTIMAL or status == cp_model.FEASIBLE:
@@ -82,8 +84,25 @@ def solve():
             visited.add(current_node)
             route.append(current_node) #Chỉ lưu các kệ
 
-        print(len(route))
-        print(" ".join(map(str,route)))
+        route_representation = [f"{len(route)}", " ".join(map(str, route))]
+
+        return {
+            'total_distance': solver.ObjectiveValue(),
+            'route_representation': route_representation
+        }
+    
+    return None
 
 if __name__ == '__main__':
-    solve()
+    if len(sys.argv) > 1:
+        file_location = sys.argv[1].strip()
+        time_limit = 2.0
+        if len(sys.argv) > 2:
+            time_limit = float(sys.argv[2].strip())
+        solution = solve_or_tools_cp_sat(file_location, time_limit)
+        if solution:
+            print(f"Distance: {solution['total_distance']}")
+            for line in solution['route_representation']:
+                print(line)
+    else:
+        print("Usage: python OR_Tools_cp_sat.py <file_location> [time_limit]")

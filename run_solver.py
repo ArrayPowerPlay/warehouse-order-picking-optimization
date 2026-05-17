@@ -9,8 +9,8 @@ sys.path.append(os.path.join(os.path.dirname(__file__), 'src'))
 from solvers.OR_Tools_cp_sat import solve_or_tools_cp_sat
 
 def run_experiment():
-    input_file = os.path.join('data', 'val_set', 'small_04_N5_M20.in')
-    time_limits = [50, 100, 200]
+    input_file = os.path.join('data', 'val_set', 'small_02_N3_M10.in')
+    time_limits = [50, 100]
     output_dir = 'outputs'
 
     if not os.path.exists(output_dir):
@@ -22,7 +22,7 @@ def run_experiment():
         solution = solve_or_tools_cp_sat(input_file, time_limit)
         
         if solution:
-            output_file_path = os.path.join(output_dir, f'small_04_N5_M20_{time_limit}s_output.txt')
+            output_file_path = os.path.join(output_dir, f'small_02_N3_M10_{time_limit}s_output.txt')
             with open(output_file_path, 'w') as f:
                 f.write(f"Distance: {solution['total_distance']}\n")
                 f.write("Route:\n")

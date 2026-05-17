@@ -1,0 +1,3 @@
+{"testcase": "small_02_N3_M10", "route": [6, 7, 9, 8], "total_distance": 219, "t_best": 0.02242829999886453, "time_limit": 30, "hyperparameters": {"alpha": 0.995, "max_no_improve": 1000, "reheat_ratio": 0.3}}
+{"testcase": "small_02_N3_M10", "route": [6, 7, 9, 8], "total_distance": 219, "t_best": 0.09773839998524636, "time_limit": 80, "hyperparameters": {"alpha": 0.995, "max_no_improve": 1000, "reheat_ratio": 0.3}}
+{"testcase": "small_02_N3_M10", "route": [6, 7, 9, 8], "total_distance": 219, "t_best": 0.09320110001135617, "time_limit": 120, "hyperparameters": {"alpha": 0.995, "max_no_improve": 1000, "reheat_ratio": 0.3}}
