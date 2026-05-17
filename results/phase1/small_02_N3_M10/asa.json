@@ -1,10 +1,13 @@
 {
     "route": [
-        616
+        6,
+        7,
+        9,
+        8
     ],
-    "total_distance": 1430,
-    "t_best": 36.95857859996613,
-    "time_limit": 900.0,
+    "total_distance": 219,
+    "t_best": 0.0221412000246346,
+    "time_limit": 60.0,
     "hyperparameters": {
         "alpha": 0.995,
         "max_no_improve": 1000,
