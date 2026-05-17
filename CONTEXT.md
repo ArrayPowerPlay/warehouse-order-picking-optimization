@@ -126,9 +126,10 @@ Dừng khi đủ hàng hoặc không còn kệ có ích. Không có tham số tu
 
 ### 4.3 Adaptive Simulated Annealing (adaptive_simulated_annealing.py)
 **Loại:** Metaheuristic (Nâng cấp từ SA gốc)
-**Biểu diễn nghiệm:** Hoán vị đầy đủ M kệ. `evaluate_route()` chuyển permutation → route.
-**Hàm lân cận (ALNS):** Swap, Insert, 2-Opt với cơ chế cập nhật trọng số động.
-**Điều kiện dừng:** Dựa trên `time_limit`; riêng Phase 1 lấy giá trị từ `TIME_LIMIT_TESTING` theo kích thước testcase.
+**Biểu diễn nghiệm:** Hoán vị đầy đủ M kệ, `evaluate_route()` cắt ra route thực tế.
+**Lân cận:** Swap, Insert, 2-Opt với cập nhật trọng số động.
+**Điều kiện dừng:** `time_limit`.
+**Lưu ý:** Operator được bias vào prefix có ảnh hưởng tới route thực tế.
 
 **Tham số tune (val_set):**
 | Tham số | Ý nghĩa | Mặc định tune |
@@ -190,51 +191,40 @@ batch_generator.py
   → sinh val_set/ và test_set/
       ↓
 PHASE 1: TÌM TIME LIMIT CHUẨN
-  - Chọn representative cases từ các folder hiện có trong results/phase1/
-  - Chạy mỗi thuật toán với cấu hình siêu tham số mặc định trên các testcase đại diện này
-  - Dùng TIME_LIMIT_TESTING theo kích thước testcase:
-      + small: M <= 20
-      + medium: 50 <= M <= 400
-      + large: M >= 500
-  - Quan sát điểm bão hòa để chốt time budget hợp lý cho từng nhóm testcase
-  - Output mỗi thuật toán trên mỗi testcase:
-      + results/phase1/<testcase>/<algorithm>.json
-      + các field gồm: route, total_distance, t_best, time_limit, hyperparameters
-      + nếu thuật toán không có hyperparameter thì hyperparameters = {}
-      + ASA dùng src/solvers/simulated_annealing/phase1.py để sinh asa.json
+  - Chọn representative cases đủ nhóm small / medium / large
+  - Chạy mỗi thuật toán với cấu hình mặc định trên các testcase này
+  - Dùng TIME_LIMIT_TESTING theo kích thước testcase
+  - Quan sát điểm bão hòa để chốt time budget chuẩn cho từng nhóm
+  - Lưu: results/phase1/<testcase>/<algorithm>.json
+  - JSON gồm: route, total_distance, t_best, time_limit, hyperparameters
       ↓
 PHASE 2: FIND BEST KNOWN SOLUTION (BFS) CHO val_set
-  - Mục đích: tạo cost reference cho toàn bộ val_set
-  - Với small case: dùng nghiệm của OR-Tools CP-SAT làm cost reference
-  - Với testcase còn lại: chạy tất cả cấu hình của tất cả thuật toán để lấy BFS_Cost
-  - Với thuật toán ngẫu nhiên: mỗi cấu hình chạy k = 10 seed (0..9), chỉ giữ kết quả tốt nhất
-  - Output lưu dưới dạng file ở results/phase2/
+  - Tạo cost reference cho toàn bộ val_set
+  - Small dùng nghiệm CP-SAT làm mốc
+  - Medium / large lấy BFS_Cost bằng cách chạy tất cả thuật toán / cấu hình
+  - Thuật toán ngẫu nhiên chạy k = 10 seed, giữ kết quả tốt nhất
+  - Lưu ở results/phase2/
       ↓
 PHASE 3: HYPERPARAMETER TUNING (val_set)
-  - Xét từng cấu hình trong lưới siêu tham số của từng thuật toán có tune
-  - Nếu thuật toán ngẫu nhiên: mỗi cấu hình chạy k = 10 seed (0..9) trên mỗi testcase
-  - Tính min_cost cho từng testcase
-  - Dùng cost reference từ Phase 2 để tính RFD
-  - Tính avg_RFD trên toàn bộ val_set
+  - Tune từng lưới siêu tham số trên val_set
+  - Thuật toán ngẫu nhiên chạy k = 10 seed
+  - Tính min_cost theo testcase, sau đó tính RFD theo cost reference của Phase 2
   - Chọn cấu hình có avg_RFD nhỏ nhất
-  - Output lưu tại results/phase3/<algorithm>.csv
+  - Lưu ở results/phase3/<algorithm>.csv
       ↓ bộ tham số tốt nhất
 PHASE 4: FIND BEST KNOWN SOLUTION (BFS) CHO test_set
   - Tạo cost reference cho toàn bộ test_set
-  - Với small case: dùng nghiệm của OR-Tools CP-SAT
-  - Với testcase còn lại: chạy tất cả cấu hình của tất cả thuật toán
-  - Với thuật toán ngẫu nhiên: mỗi cấu hình chạy k = 10 seed (0..9), chỉ giữ kết quả tốt nhất
-  - Output lưu tại results/phase4/
+  - Small dùng nghiệm CP-SAT làm mốc
+  - Medium / large lấy BFS_Cost bằng cách chạy tất cả thuật toán / cấu hình
+  - Thuật toán ngẫu nhiên chạy k = 10 seed, giữ kết quả tốt nhất
+  - Lưu ở results/phase4/
       ↓
 PHASE 5: FINAL EVALUATION
-  - Chạy từng thuật toán với cấu hình tốt nhất đã chọn ở Phase 3 trên test_set
-  - Với thuật toán ngẫu nhiên: mỗi testcase chạy k = 10 seed (0..9)
-  - Tính các metric:
-      + min_cost, max_cost, avg_cost, std_cost
-      + avg_t_best
-      + RFD cho từng testcase
-      + avg_RFD theo nhóm testcase và overall
-  - Output:
+  - Chạy từng thuật toán với cấu hình tốt nhất từ Phase 3 trên test_set
+  - Thuật toán ngẫu nhiên chạy k = 10 seed
+  - Tính: min_cost, max_cost, avg_cost, std_cost, avg_t_best, RFD
+  - Tổng hợp theo từng testcase, từng nhóm và overall
+  - Lưu:
       + results/phase5/evaluation_details.csv
       + results/phase5/summary.csv
 ```
@@ -322,4 +312,4 @@ Python >= 3.11
 
 ---
 
-*Cập nhật lần cuối: 2026-05-16*
+*Cập nhật lần cuối: 2026-05-17*

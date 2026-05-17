@@ -76,12 +76,30 @@ def asa_solver(
         return compute_route_distance(route, d), route
 
     ### Implement some ALNS operators
+    def sample_focus_positions() -> tuple[int, int]:
+        """Choose 2 positions so that at least 1 belongs to the effective prefix."""
+        prefix_len = len(current_route)
+
+        # Fallback: if the current realized route is too short, sample globally.
+        if prefix_len < 2:
+            return tuple(random.sample(range(M), 2))
+
+        # Case 1: Both elements belong to prefix.
+        if prefix_len >= M or random.random() < 0.5:
+            return tuple(random.sample(range(prefix_len), 2))
+
+        # Case 2: 1 element belongs to prefix and 1 belongs to suffix.
+        pos1 = random.randrange(prefix_len)
+        pos2 = random.randrange(prefix_len, M)
+        return pos1, pos2
+
     def op_swap(state: list[int]) -> list[int]:
         """Swap 2 elements in a route."""
         neighbor = state[:]
         if M < 2:
             return neighbor
-        pos1, pos2 = random.sample(range(M), 2)
+        # Stronger move on effective prefix: at least 1 selected element must belong to prefix.
+        pos1, pos2 = sample_focus_positions()
         neighbor[pos1], neighbor[pos2] = neighbor[pos2], neighbor[pos1]
         return neighbor
 
@@ -90,7 +108,8 @@ def asa_solver(
         neighbor = state[:]
         if M < 2:
             return neighbor
-        pos1, pos2 = random.sample(range(M), 2)
+        # Stronger move on effective prefix: at least 1 selected element must belong to prefix.
+        pos1, pos2 = sample_focus_positions()
         value = neighbor.pop(pos1)
         neighbor.insert(pos2, value)
         return neighbor
@@ -100,7 +119,8 @@ def asa_solver(
         neighbor = state[:]
         if M < 2:
             return neighbor
-        pos1, pos2 = sorted(random.sample(range(M), 2))
+        # Stronger move on effective prefix: at least 1 selected element must belong to prefix.
+        pos1, pos2 = sorted(sample_focus_positions())
         neighbor[pos1:pos2] = reversed(neighbor[pos1:pos2])
         return neighbor
 
