@@ -2,7 +2,7 @@
     "route": [11, 1, 4, 15, 16, 6, 8, 3, 10, 5, 7, 9, 2, 20],
     "total_distance": 1080,
     "t_best": 0.0839,
-    "time_limit": 900.0,
+    "time_limit": 100.0,
     "hyperparameters": {
         "num_search_workers": 0
     }
