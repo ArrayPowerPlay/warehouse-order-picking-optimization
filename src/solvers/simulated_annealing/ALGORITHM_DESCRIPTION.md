@@ -1,91 +1,35 @@
-# Mô tả Chi tiết Thuật toán Adaptive Simulated Annealing
+# Adaptive Simulated Annealing
 
-Tài liệu này mô tả chi tiết cách file `adaptive_simulated_annealing.py` hiện đang hoạt động trong repo.
+File chính: `adaptive_simulated_annealing.py`
 
-Mục tiêu của solver là tìm một thứ tự ghé thăm các kệ sao cho:
-- thu đủ tất cả sản phẩm theo đơn hàng
-- tổng quãng đường đi là nhỏ nhất có thể trong giới hạn `time_limit`
+## Tóm tắt
+- Input: `N, M, Q, d, q` từ `read_input()`
+- Output: `route, total_distance, t_best`
+- Vô nghiệm: `([], -1, -1)`
+- Dừng theo `time_limit`
 
-Thuật toán hiện tại là một biến thể **Adaptive Simulated Annealing (ASA)**, kết hợp:
-- biểu diễn nghiệm bằng hoán vị đầy đủ các kệ
-- đánh giá nghiệm bằng cách cắt prefix đủ hàng
-- nhiều toán tử lân cận
-- cập nhật trọng số operator theo epoch
-- adaptive cooling
-- re-annealing khi bị kẹt lâu
-
----
-
-## 1. Đầu vào và đầu ra
-
-### Đầu vào
-Solver đọc dữ liệu bằng `read_input()` trong `src/solvers/utils.py`, gồm:
-- `N`: số loại sản phẩm
-- `M`: số kệ
-- `Q[i][j]`: số lượng sản phẩm loại `i` ở kệ `j`
-- `d[i][j]`: khoảng cách giữa các điểm
-- `q[i]`: nhu cầu cần lấy
-
-Quy ước dữ liệu của bài toán:
+## Biểu diễn nghiệm
+- `state` là hoán vị đầy đủ các kệ `1..M`
+- `route` là prefix thực sự cần đi sau khi đã đủ hàng
 - `Q` và `q` dùng index 1-based
-- `d` dùng điểm `0` là cửa kho, `1..M` là kệ
+- `d` dùng node `0` là cửa kho
 
-### Đầu ra của `asa_solver(...)`
-Hàm hiện tại trả về bộ ba:
-- `route`: danh sách các kệ được ghé theo thứ tự
-- `best_distance`: tổng quãng đường của `route`
-- `t_best`: thời gian tính từ lúc bắt đầu thuật toán đến lúc tìm được nghiệm tốt nhất
+## Siêu tham số cần tune
+- `alpha`: hệ số làm lạnh cơ sở
+- `max_no_improve`: số bước không cải thiện trước khi re-anneal
+- `reheat_ratio`: mức phục hồi nhiệt so với `T_start`
 
-Các trường hợp đặc biệt:
-- nếu đơn hàng rỗng ngay từ đầu: trả về `([], 0, 0.0)`
-- nếu input vô nghiệm: trả về `([], -1, -1)`
+`seed` chỉ dùng để tái lập thực nghiệm, không xem là hyperparameter cần tune.
 
-`t_best` được đo bằng `time.perf_counter()` và chỉ được cập nhật khi tìm thấy nghiệm tốt hơn `best_cost` hiện tại.
+## Các bước của thuật toán
+### Bước 1. Đọc input và loại sớm case đặc biệt
+- Đọc `N, M, Q, d, q`
+- Nếu đơn hàng rỗng thì trả `([], 0, 0.0)`
+- Nếu tổng cung của một sản phẩm nhỏ hơn nhu cầu thì trả `([], -1, -1)`
 
----
-
-## 2. Biểu diễn nghiệm
-
-Thuật toán không lưu nghiệm trực tiếp dưới dạng route ngắn nhất cần đi, mà lưu một **trạng thái**:
-- `state = [shelf_1, shelf_2, ..., shelf_M]`
-- đây là một hoán vị đầy đủ của tất cả kệ từ `1` đến `M`
-
-Ví dụ:
-```python
-current_state = [4, 2, 7, 1, 3, 6, 5]
-```
-
-Từ trạng thái này, hàm `evaluate_route()` sẽ duyệt từ trái sang phải:
-1. thêm từng kệ vào route
-2. cập nhật lượng hàng đã thu được
-3. dừng ngay khi đủ tất cả sản phẩm
-
-Vì vậy:
-- `state` là **hoán vị đầy đủ**
-- `route` là **prefix thực sự cần đi**
-
-Điểm rất quan trọng:
-- **shelf id** là giá trị trong `state`, nằm trong `1..M`
-- **position index** là vị trí Python trong list, nằm trong `0..M-1`
-
-Các operator như `swap`, `insert`, `2-opt` hiện thao tác trên **position index** của list, không thao tác trực tiếp trên shelf id của dữ liệu đầu vào.
-
----
-
-## 3. Luồng chạy tổng thể
-
-Thuật toán hiện tại đi theo pipeline sau:
-
-### Bước 1. Đọc input và loại sớm các trường hợp đặc biệt
-- gọi `read_input()`
-- nếu `sum(q) == 0` thì trả về ngay `([], 0, 0.0)`
-- nếu có bất kỳ sản phẩm nào mà tổng cung trên toàn bộ kho nhỏ hơn nhu cầu, trả về `([], -1, -1)`
-
-### Bước 2. Khởi tạo đồng hồ thời gian
-- `algorithm_start = time.perf_counter()`
-- `deadline = algorithm_start + time_limit`
-
-Toàn bộ thuật toán dừng theo `deadline`, không theo số vòng lặp cố định.
+### Bước 2. Khởi tạo thời gian
+- Đặt `algorithm_start`
+- Đặt `deadline = algorithm_start + time_limit`
 
 ### Bước 3. Khởi tạo nghiệm ban đầu
 - tạo `current_state = list(range(1, M + 1))`
@@ -99,16 +43,11 @@ Sau đó:
 - `best_route = current_report_route[:]`
 - `t_best` được gán bằng thời gian từ lúc bắt đầu đến thời điểm có nghiệm ban đầu
 
-### Bước 4. Warm-up để ước lượng nhiệt độ khởi đầu `T_start`
-- lặp ngẫu nhiên các operator
-- chỉ thu thập các `delta` dương, tức những hàng xóm tệ hơn nghiệm hiện tại
-- khi đủ 100 mẫu hoặc hết thời gian thì dừng
-
-Nếu có dữ liệu:
-```python
-delta_avg = sum(deltas) / len(deltas)
-T_start = -delta_avg / math.log(0.8)
-```
+### Bước 4. Đánh giá một permutation bằng `evaluate_route()`
+- Duyệt permutation từ trái sang phải
+- Sau mỗi kệ, cập nhật lượng hàng còn thiếu
+- Khi đã đủ mọi sản phẩm thì dừng
+- Tính quãng đường của prefix đó bằng `compute_route_distance()`
 
 Ý nghĩa:
 - nhiệt độ khởi đầu được đặt sao cho một bước đi xấu điển hình có xác suất được chấp nhận khoảng `0.8`
