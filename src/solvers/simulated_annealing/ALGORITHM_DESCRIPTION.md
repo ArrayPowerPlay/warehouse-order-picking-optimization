@@ -21,6 +21,13 @@ File chính: `adaptive_simulated_annealing.py`
 
 `seed` chỉ dùng để tái lập thực nghiệm, không xem là hyperparameter cần tune.
 
+## Lưới siêu tham số cho Phase 2 / Phase 3
+- `alpha ∈ {0.99, 0.995, 0.999}`
+- `max_no_improve ∈ {1000, 2000}`
+- `reheat_ratio ∈ {0.2, 0.3, 0.5}`
+
+`seed` không thuộc lưới tune; Phase 2 / Phase 3 chỉ dùng `seed` để chạy lặp thực nghiệm và lấy thống kê theo nhiều lần chạy độc lập.
+
 ## Các bước của thuật toán
 ### Bước 1. Đọc input và loại sớm case đặc biệt
 - Đọc `N, M, Q, d, q`
