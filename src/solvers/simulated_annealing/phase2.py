@@ -56,7 +56,7 @@ def discover_val_testcases(selected_testcases: set[str] | None = None) -> list[t
         if not filename.endswith(".in"):
             continue
 
-        testcase_name, _ = os.path.splitext(filename)
+        testcase_name, _ = os.path.splitext(filename)    # Separate the filename and its extension
         if selected_testcases is not None and testcase_name not in selected_testcases:
             continue
 
@@ -136,14 +136,13 @@ def run_single_configuration(
         )
         run_results.append((seed, total_distance))
 
-    cost_min, best_seed = select_best_seed(run_results)
+    cost_min, _ = select_best_seed(run_results)
     return {
         "testcase": testcase_name,
         "alpha": alpha,
         "max_no_improve": max_no_improve,
         "reheat_ratio": reheat_ratio,
         "cost_min": cost_min,
-        "best_seed": "" if best_seed is None else best_seed,
     }
 
 
@@ -177,11 +176,12 @@ def write_phase2_csv(rows: list[dict[str, object]], output_path: str = DEFAULT_O
         "max_no_improve",
         "reheat_ratio",
         "cost_min",
-        "best_seed",
     ]
+    # newline = "" means when opening a file, Python doesn't automatically change the line break character 
+    # It let the CSV module handle line breaks automatically
     with open(output_path, "w", newline="", encoding="utf-8") as stream:
         writer = csv.DictWriter(stream, fieldnames=fieldnames)
-        writer.writeheader()
+        writer.writeheader()    # Adds the column name to the beginning of the CSV file
         writer.writerows(rows)
 
 
