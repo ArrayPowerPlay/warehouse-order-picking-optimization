@@ -1,12 +1,15 @@
 {
-    "route": [666],
+    "route": [
+        0,
+        666,
+        0
+    ],
     "total_distance": 672,
-    "t_best": 3.3073,
-    "time_limit": 900.0,
+    "t_best": 49.1463,
+    "time_limit": 600.0,
     "hyperparameters": {
-        "POP_SIZE": 100,
-        "MAX_GEN": 13662,
-        "CROSSOVER_RATE": 0.8,
-        "MUTATION_RATE": 0.1
+        "pop_size": 100,
+        "crossover_rate": 0.8,
+        "mutation_rate": 0.1
     }
 }
