@@ -3,8 +3,8 @@
         666
     ],
     "total_distance": 672,
-    "t_best": 10.801662000012584,
-    "time_limit": 900.0,
+    "t_best": 17.26910289999796,
+    "time_limit": 600.0,
     "hyperparameters": {
         "alpha": 0.995,
         "max_no_improve": 1000,

@@ -413,8 +413,8 @@
         194
     ],
     "total_distance": 157582,
-    "t_best": 349.95010529999854,
-    "time_limit": 900.0,
+    "t_best": 291.11029229999986,
+    "time_limit": 600.0,
     "hyperparameters": {
         "alpha": 0.995,
         "max_no_improve": 1000,

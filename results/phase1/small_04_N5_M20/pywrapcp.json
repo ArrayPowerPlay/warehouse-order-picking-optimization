@@ -2,7 +2,7 @@
     "route": [20, 2, 9, 7, 5, 10, 3, 8, 6, 16, 15, 4, 1, 11],
     "total_distance": 1080,
     "t_best": 10.0,
-    "time_limit": 100.0,
+    "time_limit": 18.0,
     "hyperparameters": {
         "local_search_metaheuristic": "GUIDED_LOCAL_SEARCH"
     }

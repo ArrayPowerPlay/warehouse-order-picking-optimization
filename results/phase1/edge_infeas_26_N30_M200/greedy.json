@@ -2,6 +2,6 @@
     "route": [],
     "total_distance": -1,
     "t_best": -1.0,
-    "time_limit": 900.0,
+    "time_limit": 360.0,
     "hyperparameters": {}
 }
