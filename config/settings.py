@@ -5,14 +5,14 @@ from pathlib import Path
 
 # Thời gian chạy tối đa (time limit) cho các thuật toán theo kích thước instance (giây)
 TIME_LIMIT_TESTING = {
-    "small": 100.0,
-    "medium": 600.0,
-    "large": 900.0,
+    "small": 18.0,
+    "medium": 360.0,
+    "large": 600.0,
 }
 
 TIME_LIMITS = {
     "small": 20.0,
-    "medium": 900.0,
+    "medium": 720.0,
     "large": 900.0
 }
 
