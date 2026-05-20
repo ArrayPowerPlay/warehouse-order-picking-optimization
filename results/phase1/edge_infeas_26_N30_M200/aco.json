@@ -1,13 +1,15 @@
 {
-    "route": [],
-    "total_distance": -1,
-    "t_best": -1.0,
+    "route": [
+        0,
+        0
+    ],
+    "total_distance": 1000000000000000000,
+    "t_best": 0.0,
     "time_limit": 360.0,
     "hyperparameters": {
-        "NUM_ANTS": 100,
-        "MAX_ITER": 0,
-        "ALPHA": 1.0,
-        "BETA": 3.0,
-        "RHO": 0.1
+        "num_ants": 100,
+        "alpha": 1.0,
+        "beta": 3.0,
+        "rho": 0.1
     }
 }
