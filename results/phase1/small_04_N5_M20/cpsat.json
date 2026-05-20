@@ -1,7 +1,20 @@
 {
-    "route": [11, 1, 4, 15, 16, 6, 8, 3, 10, 5, 7, 9, 2, 20],
-    "total_distance": 1080,
-    "t_best": 0.0839,
+    "route": [
+        10,
+        9,
+        15,
+        2,
+        7,
+        1,
+        17,
+        14,
+        5,
+        20,
+        13,
+        8
+    ],
+    "total_distance": 1026,
+    "t_best": 0.1585,
     "time_limit": 18.0,
     "hyperparameters": {
         "num_search_workers": 0

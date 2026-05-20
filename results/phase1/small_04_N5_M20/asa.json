@@ -14,7 +14,7 @@
         8
     ],
     "total_distance": 1026,
-    "t_best": 0.584812699991744,
+    "t_best": 0.8584709999995539,
     "time_limit": 18.0,
     "hyperparameters": {
         "alpha": 0.995,

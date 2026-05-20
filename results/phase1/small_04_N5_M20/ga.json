@@ -1,6 +1,5 @@
 {
     "route": [
-        0,
         10,
         9,
         15,
@@ -12,11 +11,10 @@
         13,
         20,
         14,
-        17,
-        0
+        17
     ],
     "total_distance": 1032,
-    "t_best": 0.0221,
+    "t_best": 0.0069,
     "time_limit": 18.0,
     "hyperparameters": {
         "pop_size": 100,

@@ -1,8 +1,6 @@
 {
     "route": [
-        0,
-        666,
-        0
+        666
     ],
     "total_distance": 672,
     "t_best": 0.0008,
