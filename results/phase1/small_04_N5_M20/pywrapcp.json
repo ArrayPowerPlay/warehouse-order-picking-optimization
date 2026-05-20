@@ -15,7 +15,7 @@
     ],
     "total_distance": 1026,
     "t_best": 10.0,
-    "time_limit": 18.0,
+    "time_limit": 30.0,
     "hyperparameters": {
         "local_search_metaheuristic": "GUIDED_LOCAL_SEARCH"
     }

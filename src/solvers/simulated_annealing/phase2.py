@@ -11,6 +11,7 @@ import argparse
 import csv
 import os
 import sys
+from concurrent.futures import ProcessPoolExecutor
 from itertools import product   # Create a Descartes product among groups of values.
 
 # Add project root to sys.path.
@@ -146,23 +147,62 @@ def run_single_configuration(
     }
 
 
-def collect_phase2_rows(selected_testcases: set[str] | None = None) -> list[dict[str, object]]:
-    """Collect all Phase 2 rows for ASA on medium/large val_set testcases."""
-    rows = []
+def build_phase2_tasks(
+    selected_testcases: set[str] | None = None,
+) -> list[tuple[str, str, float, float, int, float]]:
+    """Build independent Phase 2 tasks at testcase/config granularity."""
+    tasks = []
     hyperparameter_grid = iter_hyperparameter_grid()
 
     for testcase_name, input_path, _, time_limit in discover_val_testcases(selected_testcases):
         for alpha, max_no_improve, reheat_ratio in hyperparameter_grid:
-            row = run_single_configuration(
-                testcase_name=testcase_name,
-                input_path=input_path,
-                time_limit=time_limit,
-                alpha=alpha,
-                max_no_improve=max_no_improve,
-                reheat_ratio=reheat_ratio,
+            tasks.append(
+                (
+                    testcase_name,
+                    input_path,
+                    time_limit,
+                    alpha,
+                    max_no_improve,
+                    reheat_ratio,
+                )
             )
-            rows.append(row)
 
+    return tasks
+
+
+def run_phase2_task(task: tuple[str, str, float, float, int, float]) -> dict[str, object]:
+    """Run one independent testcase/config task. Kept top-level for multiprocessing."""
+    testcase_name, input_path, time_limit, alpha, max_no_improve, reheat_ratio = task
+    return run_single_configuration(
+        testcase_name=testcase_name,
+        input_path=input_path,
+        time_limit=time_limit,
+        alpha=alpha,
+        max_no_improve=max_no_improve,
+        reheat_ratio=reheat_ratio,
+    )
+
+
+def collect_phase2_rows(
+    selected_testcases: set[str] | None = None,
+    workers: int = 1,
+) -> list[dict[str, object]]:
+    """Collect all Phase 2 rows for ASA on medium/large val_set testcases."""
+    tasks = build_phase2_tasks(selected_testcases)
+    if workers <= 1:
+        rows = [run_phase2_task(task) for task in tasks]
+    else:
+        with ProcessPoolExecutor(max_workers=workers) as executor:
+            rows = list(executor.map(run_phase2_task, tasks))
+
+    rows.sort(
+        key=lambda row: (
+            row["testcase"],
+            row["alpha"],
+            row["max_no_improve"],
+            row["reheat_ratio"],
+        )
+    )
     return rows
 
 
@@ -198,13 +238,19 @@ def parse_args() -> argparse.Namespace:
         default=DEFAULT_OUTPUT_PATH,
         help="Output CSV path.",
     )
+    parser.add_argument(
+        "--workers",
+        type=int,
+        default=1,
+        help="Number of parallel worker processes. Use 1 to run sequentially.",
+    )
     return parser.parse_args()
 
 
 def main() -> None:
     args = parse_args()
     selected_testcases = set(args.testcase) if args.testcase else None
-    rows = collect_phase2_rows(selected_testcases)
+    rows = collect_phase2_rows(selected_testcases, workers=max(1, args.workers))
     write_phase2_csv(rows, args.output)
     print(f"Wrote {len(rows)} rows to {args.output}")
 

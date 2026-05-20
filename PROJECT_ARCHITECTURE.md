@@ -1,96 +1,246 @@
 # Cấu trúc Kiến trúc Dự án (Project Architecture)
 
-Tài liệu này mô tả chi tiết về cấu trúc thư mục, mục đích của từng file và các tệp cấu hình trong hệ thống **Warehouse Order Picking Optimization**.
+Tài liệu này mô tả cấu trúc thư mục và vai trò của các thành phần đang thực sự tồn tại trong repo **Warehouse Order Picking Optimization**.
 
 ---
 
-## 1. Cấu trúc Thư mục Tổng quan
+## 1. Cấu trúc thư mục tổng quan
 
 ```text
 warehouse-order-picking-optimization/
-├── config/                 # Thư mục chứa các file cấu hình hệ thống
-├── data/                   # Thư mục chứa dữ liệu đầu vào (testcases)
-├── notebooks/              # Thư mục chứa các file Jupyter Notebook dùng để tuning và đánh giá
-├── results/                # Thư mục chứa kết quả chạy thực nghiệm
-├── src/                    # Thư mục chứa mã nguồn chính (sinh dữ liệu, thuật toán)
-├── CONTEXT.md              # Tài liệu mô tả bài toán và overview toàn bộ project
-├── README.md               # Tài liệu giới thiệu dự án (entry point)
-├── requirements.txt        # Các thư viện phụ thuộc (dependencies)
-└── TESTCASE_CLASSIFICATION.md  # Tài liệu phân loại chi tiết các testcase
+├── config/
+│   └── settings.py
+├── data/
+│   ├── val_set/
+│   └── test_set/
+├── notebooks/
+│   ├── tuning/
+│   │   ├── genetic_algorithm_tuning.ipynb
+│   │   └── simulated_annealing_tuning.ipynb
+│   └── final_evaluation.ipynb
+├── results/
+│   ├── phase1/
+│   └── phase2/
+├── src/
+│   ├── generators/
+│   ├── solvers/
+│   └── result_aggregator_phase1.py
+├── CONTEXT.md
+├── PROJECT_ARCHITECTURE.md
+├── README.md
+├── TESTCASE_CLASSIFICATION.md
+└── requirements.txt
 ```
 
 ---
 
-## 2. Chi tiết cấu hình và mã nguồn (`src/` & `config/`)
+## 2. Cấu hình (`config/`)
 
-Đây là phần lõi của hệ thống, bao gồm cấu hình toàn cục, bộ sinh dữ liệu và các thuật toán giải quyết bài toán.
-
-### 2.1. Cấu hình hệ thống (`config/`)
-
-- **`config/settings.py`**
-  - **Mục đích:** File cấu hình toàn cục (Global Configuration) cho tất cả các solver và script đánh giá.
-  - **Nội dung chính:**
-    - `TIME_LIMITS`: Dictionary định nghĩa thời gian chạy tối đa (time limit) cho các thuật toán Heuristic/Metaheuristic dựa trên quy mô của testcase (small, medium, large, edge). Đảm bảo tính công bằng khi so sánh các thuật toán.
-    - `NUM_RUNS_PER_CONFIG`: Số lần chạy lặp lại độc lập cho các thuật toán có yếu tố ngẫu nhiên (như SA, GA) để lấy kết quả trung bình/tốt nhất nhằm triệt tiêu phương sai.
-
-### 2.2. Bộ sinh dữ liệu (`src/generators/`)
-
-Đảm nhiệm việc sinh các file dữ liệu đầu vào (`.in`) với nhiều đặc tả không gian và ràng buộc khác nhau.
-
-- **`data_generator.py`**
-  - **Mục đích:** Core engine dùng để sinh một file testcase đơn lẻ thông qua CLI tương tác hoặc được gọi trực tiếp bằng code.
-  - **Nội dung chính:**
-    - Cấu hình các hằng số toán học (`COORD_BOUND_MAX`, `MAX_RESOURCE_HARD_CAP`).
-    - Khả năng sinh ma trận tài nguyên hàng hóa trên kệ ($Q$).
-    - Khả năng sinh tọa độ kệ hàng theo 4 phân bố không gian: *Uniform Random*, *Corner Biased* (tập trung 4 góc), *Clustered* (chia cụm), và *Diagonal* (đường chéo).
-    - Khả năng sinh nhu cầu ($q$) với các tuỳ chọn đảm bảo bài toán có nghiệm (Feasible) hoặc vô nghiệm (Infeasible).
-- **`batch_generator.py`**
-  - **Mục đích:** Tự động hóa quá trình sinh tập dữ liệu lớn (`val_set` và `test_set`).
-  - **Nội dung chính:** Định nghĩa `dataset_recipe` (công thức sinh 39 testcases cho mỗi tập) với các kịch bản trải dài từ cấu trúc nhỏ (small), cấu trúc lớn (large), các kịch bản góc (edge_dense, edge_sparse) và các phân bố tọa độ.
-- **`DATA_GENERATOR_NOTE.md`**
-  - **Mục đích:** Tài liệu hướng dẫn sử dụng và giải thích toán học chi tiết về giới hạn tọa độ và cách các generator hoạt động.
-
-### 2.3. Thuật toán tối ưu (`src/solvers/`)
-
-Chứa toàn bộ các thuật toán và hàm hỗ trợ để giải quyết bài toán tìm đường đi thu gom hàng hóa.
-
-- **`utils.py`**
-  - **Mục đích:** Module hỗ trợ dùng chung cho tất cả các thuật toán.
-  - **Nội dung chính:**
-    - `read_input()`: Parser đọc file `.in` và chuyển hóa thành cấu trúc dữ liệu ma trận chuẩn (0-based/1-based routing).
-    - `validator()`: Kiểm tra tính hợp lệ về mặt dữ liệu và logic toán học của testcase đầu vào.
-    - `evaluator()`: Đánh giá một lộ trình (route) bất kỳ: tính toán tổng quãng đường, số lượng hàng thu gom được và tính hợp lệ của chu trình.
-- **`OR_Tools_cp_sat.py`**
-  - **Mục đích:** Lời giải chính xác (Exact Solver) sử dụng Google OR-Tools (CP-SAT solver).
-  - **Nội dung chính:** Mô hình hóa bài toán thành các biến nhị phân, thiết lập ràng buộc Hamiltonian path và tài nguyên, dùng để tìm ra **Nghiệm tối ưu tuyệt đối** (Optimal Solution) cho các tập nhỏ để làm Ground Truth (Baseline).
-- **`greedy.py`**
-  - **Mục đích:** Thuật toán Tham lam (Constructive Heuristic).
-  - **Nội dung chính:** Tại mỗi bước chọn kệ chưa thăm có tỉ lệ (Hàng hóa hữu ích / Khoảng cách) tốt nhất. Tốc độ cực nhanh nhưng chất lượng nghiệm chỉ ở mức trung bình.
-- **`greedy_pruning_pywrapcp.py`**
-  - **Mục đích:** Thuật toán lai (Pipeline Heuristic + Local Search).
-  - **Nội dung chính:** Kết hợp 3 bước: (1) Khởi tạo lộ trình bằng Greedy, (2) Cắt tỉa (Pruning) các kệ dư thừa, (3) Tối ưu hóa thứ tự chặng đường (Routing) bằng module Guided Local Search (`pywrapcp` của OR-Tools).
-- **`simulated_annealing.py`**
-  - **Mục đích:** Thuật toán Luyện kim chuẩn (Adaptive Simulated Annealing - ASA).
-  - **Nội dung chính:** Ứng dụng Metaheuristic. Sử dụng các cơ chế Lân cận (ALNS - Adaptive Large Neighborhood Search) như Swap, Insert, 2-Opt. Tích hợp cơ chế làm lạnh (cooling schedule) và phục hồi nhiệt (re-annealing) dựa trên số vòng lặp không cải thiện. Dừng theo `TIME_LIMITS`.
-- **`genetic_algorithm.py`** (Đang phát triển)
-  - **Mục đích:** Thuật toán Di truyền (Metaheuristic).
-- **Mã nguồn C++ (`ACO.cpp`, `GA+2opt.cpp`)**
-  - **Mục đích:** Các implementation bằng C++ của Ant Colony Optimization và Genetic Algorithm + 2-Opt dùng cho mục đích tham khảo hoặc benchmark tốc độ cấp thấp.
+### `config/settings.py`
+- File cấu hình toàn cục cho solver và script thực nghiệm.
+- Các biến chính đang dùng:
+  - `TIME_LIMIT_TESTING`: time limit cho Phase 1 theo nhóm `small`, `medium`, `large`
+  - `TIME_LIMITS`: time limit chuẩn cho các pha chạy đầy đủ
+  - `DATA_PATH`: đường dẫn gốc project
+  - `NUM_RUNS_PER_CONFIG`: số lần chạy lặp cho thuật toán ngẫu nhiên
+  - `SEEDS`: danh sách seed mặc định
 
 ---
 
-## 3. Dữ liệu và Phân tích (`data/`, `notebooks/`, `results/`)
+## 3. Dữ liệu (`data/`)
 
-### 3.1. Dữ liệu (`data/`)
-- **`val_set/`**: Chứa 39 file dữ liệu dùng cho quá trình Tuning (Grid Search) để tìm ra bộ tham số tốt nhất cho các Metaheuristic.
-- **`test_set/`**: Chứa 39 file dữ liệu độc lập dùng để thi đấu, so sánh công bằng hiệu năng (Final Evaluation) giữa các thuật toán.
+### `data/val_set/`
+- Chứa các testcase validation dùng cho Phase 1, Phase 2 và tuning.
+- Tên file bám theo nhóm testcase, ví dụ:
+  - `small_01_N2_M5.in`
+  - `medium_15_N30_M300.in`
+  - `edge_dense_30_N50_M1000.in`
 
-### 3.2. Quá trình Tuning và Đánh giá (`notebooks/`)
-Các file Jupyter Notebook để chạy thực nghiệm tương tác và vẽ đồ thị.
-- **`tuning/simulated_annealing_tuning.ipynb`**: Chạy quy trình Grid Search cho thuật toán SA trên tập `val_set`. So sánh RPD (Relative Percentage Deviation) so với nghiệm CP-SAT (Ground truth).
-- **`tuning/genetic_algorithm_tuning.ipynb`**: Quy trình Tuning tương tự dành cho thuật toán GA.
-- **`final_evaluation.ipynb`**: File tổng hợp. Chạy mọi thuật toán với cấu hình tốt nhất đã tune trên tập `test_set`, thu thập số liệu (thời gian chạy, quãng đường, độ ổn định) và xuất ra báo cáo (bảng biểu, biểu đồ Boxplot/Bar chart).
+### `data/test_set/`
+- Chứa các testcase độc lập dùng cho đánh giá cuối.
+- Cấu trúc đặt tên giống `val_set`.
 
-### 3.3. Kết quả thực nghiệm (`results/`)
-- **`val_results/`**: Lưu trữ các file log, CSV, JSON sinh ra từ quá trình tuning. Thường là bảng thành tích của các bộ tham số.
-- **`test_results/`**: Lưu trữ kết quả đánh giá cuối cùng để đưa vào báo cáo môn học/nghiên cứu.
+---
+
+## 4. Mã nguồn sinh dữ liệu (`src/generators/`)
+
+### `src/generators/data_generator.py`
+- Generator sinh một testcase `.in`.
+- Hỗ trợ sinh ma trận hàng hóa `Q`, ma trận khoảng cách `d`, nhu cầu `q`, và nhiều kiểu phân bố tọa độ.
+
+### `src/generators/batch_generator.py`
+- Sinh hàng loạt testcase cho `val_set` và `test_set`.
+- Định nghĩa recipe các nhóm `small`, `medium`, `large`, `edge`, và distribution cases.
+
+### `src/generators/DATA_GENERATOR_NOTE.md`
+- Ghi chú chi tiết cho data generator.
+
+---
+
+## 5. Mã nguồn solver (`src/solvers/`)
+
+### 5.1. File dùng chung
+
+### `src/solvers/utils.py`
+- Tiện ích chung cho toàn bộ solver.
+- Các hàm chính:
+  - `read_input()`
+  - `evaluator()`
+  - `compute_route_distance()`
+  - `validator()`
+
+### `src/solvers/phase1_edge_large_cpsat_pywrapcp.py`
+- Runner bổ sung cho Phase 1.
+- Dùng để chạy:
+  - `cpsat` cho representative edge và large cases
+  - `pywrapcp` cho representative edge cases
+- Đọc input từ `data/val_set/` và ghi đè output vào `results/phase1/<testcase>/`.
+
+### 5.2. Greedy
+
+Thư mục: `src/solvers/greedy/`
+
+### `src/solvers/greedy/greedy.py`
+- Thuật toán Greedy cơ bản.
+- Xây route bằng cách chọn kệ có tỷ lệ lợi ích/khoảng cách tốt nhất ở mỗi bước.
+
+### `src/solvers/greedy/phase1_greedy.py`
+- Runner Phase 1 cho Greedy.
+- Ghi kết quả `greedy.json` vào `results/phase1/<testcase>/`.
+
+### 5.3. Greedy + Pruning + pywrapcp
+
+Thư mục: `src/solvers/greedy_prunning_pywrapcp/`
+
+Lưu ý: tên thư mục hiện tại trong code là `prunning` theo chính tả đang dùng của repo.
+
+### `src/solvers/greedy_prunning_pywrapcp/greedy_prunning_pywrapcp.py`
+- Pipeline 3 bước:
+  - Greedy chọn tập kệ ban đầu
+  - Pruning loại kệ thừa
+  - `pywrapcp` tối ưu lại thứ tự route bằng Guided Local Search
+- Trả về `route`, `total_distance`, `t_best`.
+
+### `src/solvers/greedy_prunning_pywrapcp/phase1_greedy_prunning_pywrapcp.py`
+- Runner Phase 1 cho solver pywrapcp.
+- Ghi `pywrapcp.json` vào `results/phase1/<testcase>/`.
+
+### 5.4. CP-SAT
+
+Thư mục: `src/solvers/cp_sat/`
+
+### `src/solvers/cp_sat/cp_sat.py`
+- Solver CP-SAT dùng OR-Tools.
+- Mô hình hóa chọn kệ và chu trình bằng biến nhị phân và `AddCircuit`.
+- Có kiểm tra nhanh trường hợp vô nghiệm trước khi build model.
+
+### `src/solvers/cp_sat/phase1_cp_sat.py`
+- Runner Phase 1 cho CP-SAT.
+- Ghi `cpsat.json` vào `results/phase1/<testcase>/`.
+
+### 5.5. Simulated Annealing
+
+Thư mục: `src/solvers/simulated_annealing/`
+
+### `src/solvers/simulated_annealing/adaptive_simulated_annealing.py`
+- Solver Adaptive Simulated Annealing (ASA).
+- Dừng theo `time_limit`.
+- Có bộ tham số mặc định và cơ chế reheat.
+
+### `src/solvers/simulated_annealing/phase1.py`
+- Runner Phase 1 cho ASA.
+- Ghi `asa.json` vào `results/phase1/<testcase>/`.
+
+### `src/solvers/simulated_annealing/phase2.py`
+- Script phục vụ Phase 2 cho ASA.
+- Dùng để chạy trên tập dữ liệu lớn hơn Phase 1, hướng tới thu cost reference.
+
+### `src/solvers/simulated_annealing/ALGORITHM_DESCRIPTION.md`
+- Mô tả chi tiết ý tưởng và operator của ASA.
+
+### 5.6. Genetic Algorithm
+
+Thư mục: `src/solvers/genetic_algorithm/`
+
+### `src/solvers/genetic_algorithm/ga.py`
+- Python wrapper cho core GA viết bằng C++.
+- Gọi file thực thi `ga_core.exe` hoặc `ga_core`.
+
+### `src/solvers/genetic_algorithm/ga_core.cpp`
+- C++ core của Genetic Algorithm.
+
+### `src/solvers/genetic_algorithm/phase1_ga.py`
+- Runner Phase 1 cho GA.
+- Ghi `ga.json` vào `results/phase1/<testcase>/`.
+
+### 5.7. Ant Colony Optimization
+
+Thư mục: `src/solvers/ant_colony/`
+
+### `src/solvers/ant_colony/aco.py`
+- Python wrapper cho core ACO viết bằng C++.
+- Gọi file thực thi `aco_core.exe` hoặc `aco_core`.
+
+### `src/solvers/ant_colony/aco_core.cpp`
+- C++ core của Ant Colony Optimization.
+
+### `src/solvers/ant_colony/phase1_aco.py`
+- Runner Phase 1 cho ACO.
+- Ghi `aco.json` vào `results/phase1/<testcase>/`.
+
+---
+
+## 6. Script tổng hợp kết quả
+
+### `src/result_aggregator_phase1.py`
+- Quét các thư mục con trong `results/phase1/`.
+- Đọc các file JSON theo từng thuật toán.
+- Tổng hợp `t_best` và `time_limit` thành `results/phase1/aggregate_results.csv`.
+
+---
+
+## 7. Notebooks
+
+### `notebooks/tuning/simulated_annealing_tuning.ipynb`
+- Notebook tuning cho ASA trên `val_set`.
+
+### `notebooks/tuning/genetic_algorithm_tuning.ipynb`
+- Notebook tuning cho GA.
+
+### `notebooks/final_evaluation.ipynb`
+- Notebook phục vụ đánh giá tổng hợp và so sánh cuối cùng.
+
+---
+
+## 8. Kết quả thực nghiệm (`results/`)
+
+### `results/phase1/`
+- Đang được dùng để lưu kết quả representative runs cho Phase 1.
+- Mỗi testcase có một thư mục riêng, ví dụ:
+  - `results/phase1/small_04_N5_M20/`
+  - `results/phase1/medium_15_N30_M300/`
+  - `results/phase1/large_21_N50_M1000/`
+  - `results/phase1/edge_N1_24_N1_M500/`
+- Trong mỗi thư mục có các file JSON theo thuật toán:
+  - `greedy.json`
+  - `pywrapcp.json`
+  - `cpsat.json`
+  - `asa.json`
+  - `ga.json`
+  - `aco.json`
+- Ngoài ra có:
+  - `results/phase1/aggregate_results.csv`
+
+### `results/phase2/`
+- Thư mục đã được tạo nhưng hiện chưa thấy file kết quả trong repo.
+- Dự kiến dùng để lưu cost reference hoặc kết quả chạy giai đoạn tiếp theo.
+
+---
+
+## 9. Ghi chú về trạng thái hiện tại
+
+- Repo hiện đã tổ chức solver theo từng package con trong `src/solvers/`, không còn cấu trúc file phẳng như một số tài liệu cũ mô tả.
+- CP-SAT hiện nằm ở `src/solvers/cp_sat/`, không phải `OR_Tools_cp_sat.py`.
+- Greedy hiện nằm ở `src/solvers/greedy/greedy.py`.
+- Solver pywrapcp hiện nằm ở `src/solvers/greedy_prunning_pywrapcp/greedy_prunning_pywrapcp.py`.
+- `results/` hiện mới có `phase1/` và `phase2/`; các thư mục phase sau chưa xuất hiện trong repo hiện tại.

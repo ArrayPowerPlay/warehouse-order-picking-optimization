@@ -2,7 +2,7 @@
     "route": [],
     "total_distance": -1,
     "t_best": -1,
-    "time_limit": 360.0,
+    "time_limit": 600.0,
     "hyperparameters": {
         "num_ants": 100,
         "alpha": 1.0,

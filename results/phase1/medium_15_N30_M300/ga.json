@@ -262,7 +262,7 @@
     ],
     "total_distance": 68159,
     "t_best": 353.0788,
-    "time_limit": 360.0,
+    "time_limit": 600.0,
     "hyperparameters": {
         "pop_size": 100,
         "crossover_rate": 0.8,
