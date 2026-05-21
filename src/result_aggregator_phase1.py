@@ -5,9 +5,20 @@ import pandas as pd
 import re
 import argparse
 
-BASE_DIR = "../results"
+PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+BASE_DIR = os.path.join(PROJECT_ROOT, "results")
 PHASE_DIR = os.path.join(BASE_DIR, "phase1")
 OUTPUT_CSV = os.path.join(PHASE_DIR, "aggregate_results.csv")
+
+
+def resolve_path(path_value: str) -> str:
+    """Resolve relative paths against the project root."""
+    if os.path.isabs(path_value):
+        return path_value
+    normalized = os.path.normpath(path_value)
+    if normalized.startswith(".."):
+        normalized = normalized[3:] if normalized.startswith(".." + os.sep) else normalized
+    return os.path.abspath(os.path.join(PROJECT_ROOT, normalized))
 
 
 def extract_id_number(testcase_name):
@@ -54,12 +65,19 @@ def main():
     arg_parser.add_argument("--output_dir", type=str, default="../results/phase1", help="Directory to save the output CSV.")
     
     args = arg_parser.parse_args()
-    PHASE_DIR = os.path.join(BASE_DIR, f"phase{args.phase}")
-    OUTPUT_CSV = os.path.join(args.output_dir, args.output_csv)
+    phase_dir = os.path.join(BASE_DIR, f"phase{args.phase}")
+    output_dir = resolve_path(args.output_dir)
+    output_csv = os.path.join(output_dir, args.output_csv)
+
+    if not os.path.isdir(phase_dir):
+        raise FileNotFoundError(f"Phase directory not found: {phase_dir}")
+
+    os.makedirs(output_dir, exist_ok=True)
+
     # Get testcase folders
     testcase_dirs = [
-        d for d in os.listdir(PHASE_DIR)
-        if os.path.isdir(os.path.join(PHASE_DIR, d))
+        d for d in os.listdir(phase_dir)
+        if os.path.isdir(os.path.join(phase_dir, d))
     ]
 
     testcase_dirs.sort(key=testcase_sort_key)
@@ -68,7 +86,7 @@ def main():
     algorithms = set()
 
     for testcase in testcase_dirs:
-        testcase_path = os.path.join(PHASE_DIR, testcase)
+        testcase_path = os.path.join(phase_dir, testcase)
 
         for filename in os.listdir(testcase_path):
             if filename.endswith(".json"):
@@ -81,7 +99,7 @@ def main():
     rows = []
 
     for testcase in testcase_dirs:
-        testcase_path = os.path.join(PHASE_DIR, testcase)
+        testcase_path = os.path.join(phase_dir, testcase)
 
         row = {
             "testcase": testcase
@@ -117,10 +135,10 @@ def main():
     df = pd.DataFrame(rows)
 
     # Save CSV
-    df.to_csv(OUTPUT_CSV, index=False)
+    df.to_csv(output_csv, index=False)
 
     print(f"[INFO] Aggregate CSV saved to:")
-    print(OUTPUT_CSV)
+    print(output_csv)
 
 
 if __name__ == "__main__":
