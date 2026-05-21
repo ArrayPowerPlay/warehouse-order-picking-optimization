@@ -30,8 +30,8 @@ vector<vector<int>> d; // Ma trận khoảng cách
 vector<int> q; // Số lượng sản phẩm cần lấy
 
 // Bộ sinh số ngẫu nhiên
-//mt19937 rng(12345);
-mt19937 rng(random_device{}());
+unsigned int RNG_SEED = static_cast<unsigned int>(random_device{}());
+mt19937 rng;
 uniform_real_distribution<double> dist_real(0.0, 1.0);
 
 struct Individual
@@ -193,6 +193,10 @@ int main(int argc, char* argv[])
         CROSSOVER_RATE = atof(argv[3]);
         MUTATION_RATE = atof(argv[4]);
     }
+    if (argc >= 6) {
+        RNG_SEED = static_cast<unsigned int>(strtoul(argv[5], nullptr, 10));
+    }
+    rng.seed(RNG_SEED);
     // --------------------------------------------------
 
     if (!(cin >> N >> M)) return 0; // Check luồng dữ liệu an toàn

@@ -19,6 +19,6 @@ TIME_LIMITS = {
 DATA_PATH = Path(__file__).resolve().parent.parent
 
 # Số lần chạy độc lập cho mỗi bộ tham số trên 1 testcase
-NUM_RUNS_PER_CONFIG = 5
+NUM_RUNS_PER_CONFIG = 3
 # Các giá trị seed sử dụng cho một thuật toán
 SEEDS = [0, 1, 2]

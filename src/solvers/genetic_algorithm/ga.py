@@ -5,6 +5,7 @@ The solver stops by time limit and returns:
     route, total_distance, t_best
 """
 import argparse
+import io
 import os
 import sys
 import subprocess
@@ -13,6 +14,8 @@ import subprocess
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../.."))
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
+
+from src.solvers.utils import read_input
 
 # Các tham số mặc định cho GA
 DEFAULT_TIME_LIMIT = 5.0
@@ -25,6 +28,7 @@ def ga_solver(
     pop_size: int = DEFAULT_POP_SIZE,
     crossover_rate: float = DEFAULT_CROSSOVER_RATE,
     mutation_rate: float = DEFAULT_MUTATION_RATE,
+    seed: int | None = None,
 ):
     """Run GA (C++ core) and return route, total distance, and t_best."""
     
@@ -44,14 +48,24 @@ def ga_solver(
     if not input_data.strip():
          return [], 0, 0.0
 
+    N, M, Q, _, q = read_input(io.StringIO(input_data))
+    if sum(q) == 0:
+        return [], 0, 0.0
+
+    for item_idx in range(1, N + 1):
+        if sum(Q[item_idx][shelf_idx] for shelf_idx in range(1, M + 1)) < q[item_idx]:
+            return [], -1, -1.0
+
     # Đóng gói tham số truyền qua Command Line cho C++
     args = [
         cpp_executable,
         str(time_limit),
         str(pop_size),
         str(crossover_rate),
-        str(mutation_rate)
+        str(mutation_rate),
     ]
+    if seed is not None:
+        args.append(str(seed))
 
     try:
         # Gọi C++, truyền input_data vào luồng stdin của C++, hứng kết quả từ stdout
@@ -84,6 +98,7 @@ if __name__ == "__main__":
     parser.add_argument("--pop_size", type=int, default=DEFAULT_POP_SIZE)
     parser.add_argument("--crossover_rate", type=float, default=DEFAULT_CROSSOVER_RATE)
     parser.add_argument("--mutation_rate", type=float, default=DEFAULT_MUTATION_RATE)
+    parser.add_argument("--seed", type=int, default=None)
     args = parser.parse_args()
 
     best_route, best_distance, t_best = ga_solver(
@@ -91,6 +106,7 @@ if __name__ == "__main__":
         pop_size=args.pop_size,
         crossover_rate=args.crossover_rate,
         mutation_rate=args.mutation_rate,
+        seed=args.seed,
     )
 
     print(best_route)
