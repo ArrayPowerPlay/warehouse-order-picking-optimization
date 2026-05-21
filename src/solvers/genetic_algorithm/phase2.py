@@ -1,9 +1,12 @@
 """
-Phase 2 runner for Adaptive Simulated Annealing.
+Phase 2 runner for Genetic Algorithm.
 
-This script scans all val_set testcases, skips small instances, runs the ASA
+This script scans all val_set testcases, skips small instances, runs the GA
 hyperparameter grid on medium/large instances, repeats each configuration on
-all configured seeds, and writes results/phase2/asa.csv.
+all configured seeds, and writes results/phase2/ga.csv.
+
+Unlike ASA phase2, rows are appended immediately after each finished
+(testcase, configuration) so progress is visible during long runs.
 """
 from __future__ import annotations
 
@@ -11,8 +14,8 @@ import argparse
 import csv
 import os
 import sys
-from concurrent.futures import ProcessPoolExecutor
-from itertools import product   # Create a Descartes product among groups of values.
+from concurrent.futures import ProcessPoolExecutor, as_completed
+from itertools import product
 
 # Add project root to sys.path.
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../.."))
@@ -20,17 +23,25 @@ if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
 from config.settings import SEEDS, TIME_LIMITS
-from src.solvers.simulated_annealing.adaptive_simulated_annealing import asa_solver
+from src.solvers.genetic_algorithm.ga import ga_solver
 from src.solvers.utils import read_input
 
 
 VAL_SET_ROOT = os.path.join(project_root, "data", "val_set")
 PHASE2_ROOT = os.path.join(project_root, "results", "phase2")
-DEFAULT_OUTPUT_PATH = os.path.join(PHASE2_ROOT, "asa.csv")
+DEFAULT_OUTPUT_PATH = os.path.join(PHASE2_ROOT, "ga.csv")
 
-ALPHA_GRID = (0.99, 0.995, 0.999)
-MAX_NO_IMPROVE_GRID = (1000, 2000)
-REHEAT_RATIO_GRID = (0.2, 0.3, 0.5)
+POP_SIZE_GRID = (100, 200)
+CROSSOVER_RATE_GRID = (0.7, 0.8, 0.9)
+MUTATION_RATE_GRID = (0.05, 0.1, 0.2)
+
+FIELDNAMES = [
+    "testcase",
+    "pop_size",
+    "crossover_rate",
+    "mutation_rate",
+    "cost_min",
+]
 
 
 def classify_testcase_size(m: int) -> str:
@@ -44,9 +55,9 @@ def classify_testcase_size(m: int) -> str:
     raise ValueError(f"Cannot classify testcase with M={m}.")
 
 
-def iter_hyperparameter_grid() -> list[tuple[float, int, float]]:
-    """Return the fixed ASA grid used for Phase 2 / 3."""
-    return list(product(ALPHA_GRID, MAX_NO_IMPROVE_GRID, REHEAT_RATIO_GRID))
+def iter_hyperparameter_grid() -> list[tuple[int, float, float]]:
+    """Return the fixed GA grid used for Phase 2."""
+    return list(product(POP_SIZE_GRID, CROSSOVER_RATE_GRID, MUTATION_RATE_GRID))
 
 
 def discover_val_testcases(selected_testcases: set[str] | None = None) -> list[tuple[str, str, str, float]]:
@@ -57,7 +68,7 @@ def discover_val_testcases(selected_testcases: set[str] | None = None) -> list[t
         if not filename.endswith(".in"):
             continue
 
-        testcase_name, _ = os.path.splitext(filename)    # Separate the filename and its extension
+        testcase_name, _ = os.path.splitext(filename)
         if selected_testcases is not None and testcase_name not in selected_testcases:
             continue
 
@@ -77,21 +88,21 @@ def discover_val_testcases(selected_testcases: set[str] | None = None) -> list[t
 def run_single_seed(
     input_path: str,
     time_limit: float,
-    alpha: float,
-    max_no_improve: int,
-    reheat_ratio: float,
+    pop_size: int,
+    crossover_rate: float,
+    mutation_rate: float,
     seed: int,
 ) -> int:
-    """Run one ASA configuration on one seed and return total_distance."""
+    """Run one GA configuration on one seed and return total_distance."""
     with open(input_path, encoding="utf-8") as stream:
         original_stdin = sys.stdin
         try:
             sys.stdin = stream
-            _, total_distance, _ = asa_solver(
+            _, total_distance, _ = ga_solver(
                 time_limit=time_limit,
-                alpha=alpha,
-                max_no_improve=max_no_improve,
-                reheat_ratio=reheat_ratio,
+                pop_size=pop_size,
+                crossover_rate=crossover_rate,
+                mutation_rate=mutation_rate,
                 seed=seed,
             )
         finally:
@@ -120,9 +131,9 @@ def run_single_configuration(
     testcase_name: str,
     input_path: str,
     time_limit: float,
-    alpha: float,
-    max_no_improve: int,
-    reheat_ratio: float,
+    pop_size: int,
+    crossover_rate: float,
+    mutation_rate: float,
 ) -> dict[str, object]:
     """Run one testcase/configuration across all seeds and summarize it."""
     run_results = []
@@ -130,9 +141,9 @@ def run_single_configuration(
         total_distance = run_single_seed(
             input_path=input_path,
             time_limit=time_limit,
-            alpha=alpha,
-            max_no_improve=max_no_improve,
-            reheat_ratio=reheat_ratio,
+            pop_size=pop_size,
+            crossover_rate=crossover_rate,
+            mutation_rate=mutation_rate,
             seed=seed,
         )
         run_results.append((seed, total_distance))
@@ -140,94 +151,107 @@ def run_single_configuration(
     cost_min, _ = select_best_seed(run_results)
     return {
         "testcase": testcase_name,
-        "alpha": alpha,
-        "max_no_improve": max_no_improve,
-        "reheat_ratio": reheat_ratio,
+        "pop_size": pop_size,
+        "crossover_rate": crossover_rate,
+        "mutation_rate": mutation_rate,
         "cost_min": cost_min,
     }
 
 
 def build_phase2_tasks(
     selected_testcases: set[str] | None = None,
-) -> list[tuple[str, str, float, float, int, float]]:
+) -> list[tuple[str, str, float, int, float, float]]:
     """Build independent Phase 2 tasks at testcase/config granularity."""
     tasks = []
     hyperparameter_grid = iter_hyperparameter_grid()
 
     for testcase_name, input_path, _, time_limit in discover_val_testcases(selected_testcases):
-        for alpha, max_no_improve, reheat_ratio in hyperparameter_grid:
+        for pop_size, crossover_rate, mutation_rate in hyperparameter_grid:
             tasks.append(
                 (
                     testcase_name,
                     input_path,
                     time_limit,
-                    alpha,
-                    max_no_improve,
-                    reheat_ratio,
+                    pop_size,
+                    crossover_rate,
+                    mutation_rate,
                 )
             )
 
     return tasks
 
 
-def run_phase2_task(task: tuple[str, str, float, float, int, float]) -> dict[str, object]:
+def run_phase2_task(task: tuple[str, str, float, int, float, float]) -> dict[str, object]:
     """Run one independent testcase/config task. Kept top-level for multiprocessing."""
-    testcase_name, input_path, time_limit, alpha, max_no_improve, reheat_ratio = task
+    testcase_name, input_path, time_limit, pop_size, crossover_rate, mutation_rate = task
     return run_single_configuration(
         testcase_name=testcase_name,
         input_path=input_path,
         time_limit=time_limit,
-        alpha=alpha,
-        max_no_improve=max_no_improve,
-        reheat_ratio=reheat_ratio,
+        pop_size=pop_size,
+        crossover_rate=crossover_rate,
+        mutation_rate=mutation_rate,
     )
 
 
-def collect_phase2_rows(
+def write_csv_header(output_path: str) -> None:
+    """Create or overwrite CSV and write header once."""
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+    with open(output_path, "w", newline="", encoding="utf-8") as stream:
+        writer = csv.DictWriter(stream, fieldnames=FIELDNAMES)
+        writer.writeheader()
+        stream.flush()
+
+
+def append_csv_row(output_path: str, row: dict[str, object]) -> None:
+    """Append one finished row immediately and flush it."""
+    with open(output_path, "a", newline="", encoding="utf-8") as stream:
+        writer = csv.DictWriter(stream, fieldnames=FIELDNAMES)
+        writer.writerow(row)
+        stream.flush()
+
+
+def execute_phase2(
     selected_testcases: set[str] | None = None,
+    output_path: str = DEFAULT_OUTPUT_PATH,
     workers: int = 1,
-) -> list[dict[str, object]]:
-    """Collect all Phase 2 rows for ASA on medium/large val_set testcases."""
+) -> int:
+    """Execute Phase 2 and append rows immediately as tasks finish."""
     tasks = build_phase2_tasks(selected_testcases)
+    write_csv_header(output_path)
+
+    total_tasks = len(tasks)
+    completed = 0
+
     if workers <= 1:
-        rows = [run_phase2_task(task) for task in tasks]
+        for task in tasks:
+            row = run_phase2_task(task)
+            append_csv_row(output_path, row)
+            completed += 1
+            print(
+                f"[{completed}/{total_tasks}] Appended {row['testcase']} | "
+                f"pop_size={row['pop_size']} | crossover_rate={row['crossover_rate']} | "
+                f"mutation_rate={row['mutation_rate']} | cost_min={row['cost_min']}"
+            )
     else:
         with ProcessPoolExecutor(max_workers=workers) as executor:
-            rows = list(executor.map(run_phase2_task, tasks))
+            futures = [executor.submit(run_phase2_task, task) for task in tasks]
+            for future in as_completed(futures):
+                row = future.result()
+                append_csv_row(output_path, row)
+                completed += 1
+                print(
+                    f"[{completed}/{total_tasks}] Appended {row['testcase']} | "
+                    f"pop_size={row['pop_size']} | crossover_rate={row['crossover_rate']} | "
+                    f"mutation_rate={row['mutation_rate']} | cost_min={row['cost_min']}"
+                )
 
-    rows.sort(
-        key=lambda row: (
-            row["testcase"],
-            row["alpha"],
-            row["max_no_improve"],
-            row["reheat_ratio"],
-        )
-    )
-    return rows
-
-
-def write_phase2_csv(rows: list[dict[str, object]], output_path: str = DEFAULT_OUTPUT_PATH) -> None:
-    """Write Phase 2 ASA results to CSV."""
-    os.makedirs(os.path.dirname(output_path), exist_ok=True)
-
-    fieldnames = [
-        "testcase",
-        "alpha",
-        "max_no_improve",
-        "reheat_ratio",
-        "cost_min",
-    ]
-    # newline = "" means when opening a file, Python doesn't automatically change the line break character 
-    # It let the CSV module handle line breaks automatically
-    with open(output_path, "w", newline="", encoding="utf-8") as stream:
-        writer = csv.DictWriter(stream, fieldnames=fieldnames)
-        writer.writeheader()    # Adds the column name to the beginning of the CSV file
-        writer.writerows(rows)
+    return total_tasks
 
 
 def parse_args() -> argparse.Namespace:
     """Parse CLI arguments for optional targeted runs."""
-    parser = argparse.ArgumentParser(description="Phase 2 runner for Adaptive Simulated Annealing")
+    parser = argparse.ArgumentParser(description="Phase 2 runner for Genetic Algorithm")
     parser.add_argument(
         "--testcase",
         action="append",
@@ -250,9 +274,12 @@ def parse_args() -> argparse.Namespace:
 def main() -> None:
     args = parse_args()
     selected_testcases = set(args.testcase) if args.testcase else None
-    rows = collect_phase2_rows(selected_testcases, workers=max(1, args.workers))
-    write_phase2_csv(rows, args.output)
-    print(f"Wrote {len(rows)} rows to {args.output}")
+    total_rows = execute_phase2(
+        selected_testcases=selected_testcases,
+        output_path=args.output,
+        workers=max(1, args.workers),
+    )
+    print(f"Wrote {total_rows} rows to {args.output}")
 
 
 if __name__ == "__main__":

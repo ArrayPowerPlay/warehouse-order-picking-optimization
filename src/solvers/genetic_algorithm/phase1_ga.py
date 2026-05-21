@@ -18,8 +18,6 @@ if project_root not in sys.path:
 
 from config.settings import TIME_LIMIT_TESTING
 
-# Import bộ GA của bạn (Tùy chỉnh lại đường dẫn import nếu bạn đặt thư mục khác)
-# Giả sử bạn đặt ga.py tại src/solvers/genetic_algorithm/ga.py
 from src.solvers.genetic_algorithm.ga import (
     DEFAULT_POP_SIZE,
     DEFAULT_CROSSOVER_RATE,
@@ -120,15 +118,13 @@ def main() -> None:
     print("=" * 60)
     
     for idx, testcase_name in enumerate(testcases, 1):
-        # 1. In ra thông báo ngay lúc BẮT ĐẦU chạy testcase này
+        # In ra thông báo ngay lúc chạy testcase này
         # end="", flush=True giúp dòng chữ không bị xuống dòng ngay lập tức
         print(f"[{idx}/{total}] Đang xử lý: {testcase_name} ... ", end="", flush=True)
         
-        # 2. Gọi thuật toán chạy (C++ hoặc ASA sẽ tốn thời gian ở bước này)
         run_single_testcase(testcase_name)
         
-        # 3. Sau khi thuật toán chạy xong, in chữ "Hoàn thành" lên cùng dòng đó
-        print("✅ Hoàn thành!")
+        print("Hoàn thành!")
 
 if __name__ == "__main__":
     main()

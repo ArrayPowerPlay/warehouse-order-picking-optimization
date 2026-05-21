@@ -1,6 +1,5 @@
 {
     "route": [
-        0,
         500,
         1,
         464,
@@ -973,12 +972,11 @@
         563,
         855,
         150,
-        32,
-        0
+        32
     ],
     "total_distance": 477161,
     "t_best": 240.6538,
-    "time_limit": 600.0,
+    "time_limit": 900.0,
     "hyperparameters": {
         "pop_size": 100,
         "crossover_rate": 0.8,
