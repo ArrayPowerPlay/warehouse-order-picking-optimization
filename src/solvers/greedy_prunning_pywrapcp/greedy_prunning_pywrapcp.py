@@ -12,16 +12,16 @@ if project_root not in sys.path:
 from src.solvers.utils import read_input, compute_route_distance
 
 def pywrapcp_solver(time_limit: float):
-    """Run Greedy Pruning + Pywrapcp solver with Time Sweep to find t_best."""
+    """Run Greedy Pruning + Pywrapcp solver for a single given time_limit."""
     # 1. ĐỌC DỮ LIỆU
     N, M, Q, d, q = read_input()
 
     if sum(q) == 0:
-        return [], 0, 0.0
+        return [], 0
 
     for item_idx in range(1, N + 1):
         if sum(Q[item_idx][shelf_idx] for shelf_idx in range(1, M + 1)) < q[item_idx]:
-            return [], -1, -1.0
+            return [], -1
 
     # 2. CHẠY GREEDY KHỞI TẠO & PRUNING 
     current_collected = [0] * (N + 1)
@@ -73,73 +73,54 @@ def pywrapcp_solver(time_limit: float):
             
     pruned_route.reverse()
 
-    time_checkpoints = [10.0, 30.0, 60.0, 120.0, 300.0, 600.0, 900.0]
+    # 3. CHẠY OR-TOOLS (Chạy 1 lần duy nhất theo time_limit)
+    manager = pywrapcp.RoutingIndexManager(M + 1, 1, 0)
+    routing = pywrapcp.RoutingModel(manager)
+
+    def distance_callback(from_index, to_index):
+        return d[manager.IndexToNode(from_index)][manager.IndexToNode(to_index)]
+
+    transit_cb = routing.RegisterTransitCallback(distance_callback)
+    routing.SetArcCostEvaluatorOfAllVehicles(transit_cb)
+
+    for p in range(1, N + 1):
+        def demand_callback(from_index, p=p):
+            node = manager.IndexToNode(from_index)
+            if node == 0:
+                return 0
+            return Q[p][node]
+
+        demand_id = routing.RegisterUnaryTransitCallback(demand_callback)
+        total = sum(Q[p][j] for j in range(1, M + 1))
+        
+        routing.AddDimension(demand_id, 0, total, True, f"Prod_{p}")
+        dim = routing.GetDimensionOrDie(f"Prod_{p}")
+        dim.CumulVar(routing.End(0)).SetRange(q[p], total)
+
+    for node in range(1, M + 1):
+        routing.AddDisjunction([manager.NodeToIndex(node)], 0)
+
+    search_parameters = pywrapcp.DefaultRoutingSearchParameters()
+    search_parameters.local_search_metaheuristic = (
+        routing_enums_pb2.LocalSearchMetaheuristic.GUIDED_LOCAL_SEARCH)
     
-    # Chỉ lấy những mốc nằm trong giới hạn time_limit của file config
-    valid_checkpoints = [t for t in time_checkpoints if t < time_limit]
-    if time_limit not in valid_checkpoints:
-        valid_checkpoints.append(float(time_limit))
+    # Thiết lập thời gian (Ép kiểu int để tránh lỗi phẩy động)
+    search_parameters.time_limit.seconds = max(1, int(time_limit))
 
-    best_distance = float('inf')
-    best_route = []
-    t_best_saturation = -1.0
+    initial_assignment = routing.ReadAssignmentFromRoutes([pruned_route], True)
+    assignment = routing.SolveFromAssignmentWithParameters(initial_assignment, search_parameters)
 
-    # Lặp qua từng mốc thời gian để dò điểm bão hòa
-    for t_limit in valid_checkpoints:
-        manager = pywrapcp.RoutingIndexManager(M + 1, 1, 0)
-        routing = pywrapcp.RoutingModel(manager)
+    # 4. TRẢ VỀ KẾT QUẢ
+    if assignment:
+        route = []
+        index = routing.Start(0)
+        while not routing.IsEnd(index):
+            node = manager.IndexToNode(index)
+            if node != 0:
+                route.append(node)
+            index = assignment.Value(routing.NextVar(index))
 
-        def distance_callback(from_index, to_index):
-            return d[manager.IndexToNode(from_index)][manager.IndexToNode(to_index)]
+        current_distance = compute_route_distance(route, d)
+        return route, current_distance
 
-        transit_cb = routing.RegisterTransitCallback(distance_callback)
-        routing.SetArcCostEvaluatorOfAllVehicles(transit_cb)
-
-        for p in range(1, N + 1):
-            def demand_callback(from_index, p=p):
-                node = manager.IndexToNode(from_index)
-                if node == 0:
-                    return 0
-                return Q[p][node]
-
-            demand_id = routing.RegisterUnaryTransitCallback(demand_callback)
-            total = sum(Q[p][j] for j in range(1, M + 1))
-            
-            routing.AddDimension(demand_id, 0, total, True, f"Prod_{p}")
-            dim = routing.GetDimensionOrDie(f"Prod_{p}")
-            dim.CumulVar(routing.End(0)).SetRange(q[p], total)
-
-        for node in range(1, M + 1):
-            routing.AddDisjunction([manager.NodeToIndex(node)], 0)
-
-        search_parameters = pywrapcp.DefaultRoutingSearchParameters()
-        search_parameters.local_search_metaheuristic = (
-            routing_enums_pb2.LocalSearchMetaheuristic.GUIDED_LOCAL_SEARCH)
-        
-        # Thiết lập thời gian theo mốc hiện tại của vòng lặp Sweep
-        search_parameters.time_limit.seconds = max(1, int(t_limit))
-
-        initial_assignment = routing.ReadAssignmentFromRoutes([pruned_route], True)
-        assignment = routing.SolveFromAssignmentWithParameters(initial_assignment, search_parameters)
-
-        if assignment:
-            route = []
-            index = routing.Start(0)
-            while not routing.IsEnd(index):
-                node = manager.IndexToNode(index)
-                if node != 0:
-                    route.append(node)
-                index = assignment.Value(routing.NextVar(index))
-
-            current_distance = compute_route_distance(route, d)
-            
-            # Nếu kết quả tốt hơn, cập nhật kỷ lục và ghi nhận mốc thời gian t_best
-            if current_distance < best_distance:
-                best_distance = current_distance
-                best_route = route
-                t_best_saturation = float(t_limit)
-
-    if best_distance == float('inf'):
-        return [], -1, -1.0
-        
-    return best_route, best_distance, t_best_saturation
+    return [], -1
