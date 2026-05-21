@@ -227,6 +227,42 @@ int main(int argc, char* argv[])
     ofstream file_out("convergence.csv");
     ------------------------------------------------------------*/
 
+    // ========================================================
+    // --- THÊM VÀO: CHỐT CHẶN KIỂM TRA DỮ LIỆU HỢP LỆ ---
+    // ========================================================
+    long long total_required = 0;
+    for (int i = 0; i < N; ++i) {
+        total_required += q[i];
+    }
+
+    // 1. Nếu đơn hàng trống
+    if (total_required == 0) {
+        cout << "0 0.0000\n"; // Dòng 1: Cost = 0, Time = 0
+        cout << "\n";         // Dòng 2: Route trống
+        return 0;             // Kết thúc chương trình luôn
+    }
+
+    // 2. Kiểm tra xem kho có đủ hàng không
+    bool is_feasible = true;
+    for (int i = 0; i < N; ++i) {
+        long long total_in_warehouse = 0;
+        for (int j = 1; j <= M; ++j) {
+            total_in_warehouse += Q[i][j];
+        }
+        if (total_in_warehouse < q[i]) {
+            is_feasible = false;
+            break;
+        }
+    }
+
+    // Nếu thiếu hàng
+    if (!is_feasible) {
+        cout << "-1 -1.0000\n"; // Dòng 1: Cost = -1, Time = -1
+        cout << "\n";           // Dòng 2: Route trống
+        return 0;               // Kết thúc chương trình luôn
+    }
+    // ========================================================
+
     auto start_time = chrono::high_resolution_clock::now();
     double t_best = 0.0;
 
@@ -353,11 +389,11 @@ int main(int argc, char* argv[])
     cout << best_overall.cost << " " << fixed << setprecision(4) << t_best << "\n";
     
     // Dòng 2: Lộ trình (Route) - Tự động thêm điểm 0 ở đầu và cuối
-    cout << "0 ";
+    //cout << "0 ";
     for (size_t i = 0; i < best_overall.path.size(); ++i) {
         cout << best_overall.path[i] << " ";
     }
-    cout << "0\n";
+    //cout << "0\n";
     // ------------------------------------------
 
     return 0;
