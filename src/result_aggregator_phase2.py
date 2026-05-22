@@ -41,7 +41,8 @@ def testcase_sort_key(name):
     elif name.startswith("large_"):
         return (2, id_num, name)
     elif name.startswith("edge_"):
-        return (3, id_num, name)
+        subgroup = extract_dist_subgroup(name)
+        return (3, subgroup, id_num, name)
     elif name.startswith("dist_"):
         subgroup = extract_dist_subgroup(name)
         return (4, subgroup, id_num, name)
@@ -61,7 +62,8 @@ def determine_group(name):
     elif name.startswith("large_"):
         return "large"
     elif name.startswith("edge_"):
-        return "edge"
+        match = re.match(r'^(edge_[a-zA-Z0-9]+)', name)
+        return match.group(1) if match else "edge"
     elif name.startswith("dist_"):
         # Trích xuất "dist_cluster", "dist_corner", "dist_diagonal"
         match = re.match(r'^(dist_[a-zA-Z0-9]+)', name)
