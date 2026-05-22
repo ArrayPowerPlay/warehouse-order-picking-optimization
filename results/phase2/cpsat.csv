@@ -1,0 +1,10 @@
+testcase,num_search_workers,cost_min
+dist_cluster_35_N30_M300,0,30629
+dist_corner_31_N15_M150,0,14450
+dist_diagonal_38_N30_M300,0,36257
+medium_14_N30_M250,0,59500
+medium_15_N30_M300,0,60484
+medium_17_N35_M400,0,143229
+small_01_N2_M5,0,128
+small_03_N5_M10,0,432
+small_04_N5_M20,0,1026

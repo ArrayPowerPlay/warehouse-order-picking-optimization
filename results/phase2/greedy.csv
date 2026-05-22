@@ -1,0 +1,13 @@
+testcase,cost_min
+dist_cluster_35_N30_M300,40944
+dist_corner_31_N15_M150,17713
+dist_diagonal_38_N30_M300,48517
+edge_N1_24_N1_M500,168739
+edge_dense_30_N50_M1000,672
+edge_sparse_27_N40_M800,437344
+large_19_N40_M800,402636
+large_21_N50_M1000,566872
+large_22_N50_M1000,537330
+medium_14_N30_M250,85999
+medium_15_N30_M300,82366
+medium_17_N35_M400,154615
