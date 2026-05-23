@@ -1,60 +1,20 @@
+"""Aggregate Phase 1 JSON results into a single CSV summary file."""
 import os
 import json
 import math
 import pandas as pd
-import re
 import argparse
 
-PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+from result_aggregator_common import (
+    PROJECT_ROOT,
+    resolve_project_path,
+    testcase_sort_key_by_prefix,
+)
+
+
 BASE_DIR = os.path.join(PROJECT_ROOT, "results")
 PHASE_DIR = os.path.join(BASE_DIR, "phase1")
 OUTPUT_CSV = os.path.join(PHASE_DIR, "aggregate_results.csv")
-
-
-def resolve_path(path_value: str) -> str:
-    """Resolve relative paths against the project root."""
-    if os.path.isabs(path_value):
-        return path_value
-    normalized = os.path.normpath(path_value)
-    if normalized.startswith(".."):
-        normalized = normalized[3:] if normalized.startswith(".." + os.sep) else normalized
-    return os.path.abspath(os.path.join(PROJECT_ROOT, normalized))
-
-
-def extract_id_number(testcase_name):
-    """
-    Extract id number of testcase.
-    Example:
-        small_26_N30_M200 -> 26
-    """
-    match = re.search(r'(\d+)', testcase_name)
-    return int(match.group(1)) if match else math.inf
-
-
-def testcase_sort_key(name):
-    """
-    Sorting priority:
-        small -> medium -> large -> edge -> others
-    Then sort by numeric id.
-    Then alphabetical.
-    """
-
-    lower = name.lower()
-
-    if lower.startswith("small"):
-        priority = 0
-    elif lower.startswith("medium"):
-        priority = 1
-    elif lower.startswith("large"):
-        priority = 2
-    elif lower.startswith("edge"):
-        priority = 3
-    else:
-        priority = 4
-
-    id_number = extract_id_number(name)
-
-    return (priority, id_number, name)
 
 
 def main():
@@ -66,7 +26,7 @@ def main():
     
     args = arg_parser.parse_args()
     phase_dir = os.path.join(BASE_DIR, f"phase{args.phase}")
-    output_dir = resolve_path(args.output_dir)
+    output_dir = resolve_project_path(args.output_dir)
     output_csv = os.path.join(output_dir, args.output_csv)
 
     if not os.path.isdir(phase_dir):
@@ -80,7 +40,7 @@ def main():
         if os.path.isdir(os.path.join(phase_dir, d))
     ]
 
-    testcase_dirs.sort(key=testcase_sort_key)
+    testcase_dirs.sort(key=testcase_sort_key_by_prefix)
 
     # Pass 1: collect all algorithm names
     algorithms = set()
