@@ -1,0 +1,3 @@
+alpha,max_no_improve,reheat_ratio,avg_RFD,group
+0.999,1000,0.3,13.030757,medium
+0.995,2000,0.2,14.690585,large

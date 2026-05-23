@@ -1,294 +1,350 @@
 # CONTEXT.md — Warehouse Order Picking Optimization
 
-> File này tổng hợp toàn bộ thông tin về project. Đọc file này trước khi làm việc với bất kỳ phần nào của codebase. Mỗi khi cập nhật 1 thông tin quan trọng cần cho lần đọc tiếp theo, tự động cập nhật file này.
+> File này tổng hợp thông tin cốt lõi về project, workflow thực nghiệm, và các quyết định phương pháp luận đang áp dụng. Khi logic thực nghiệm thay đổi, cập nhật file này trước.
 
 ---
 
-## 1. Bài toán (Problem Statement)
+## 1. Bài toán
 
 **Order Picking Route in Warehouse** (Đại học Bách Khoa Hà Nội)
 
-Một kho hàng có **M kệ** (đánh số 1..M) và **N loại sản phẩm** (đánh số 1..N).
+Một kho hàng có `M` kệ và `N` loại sản phẩm.
 
-- `Q[i][j]` = số lượng sản phẩm loại `i` được lưu tại kệ `j`
-- `q[i]` = tổng số sản phẩm loại `i` mà nhân viên cần thu gom cho đơn hàng
-- `d(i, j)` = khoảng cách di chuyển từ điểm `i` đến điểm `j` (0 = cửa kho, 1..M = kệ)
+- `Q[i][j]`: số lượng sản phẩm loại `i` tại kệ `j`
+- `q[i]`: nhu cầu cần lấy của sản phẩm `i`
+- `d(i, j)`: khoảng cách từ điểm `i` đến điểm `j`
 
-Nhân viên xuất phát từ **cửa kho (điểm 0)**, chọn một chuỗi kệ để ghé thăm (mỗi kệ **tối đa một lần**), thu gom đủ số lượng từng loại sản phẩm theo đơn hàng, rồi **quay lại cửa kho**.
+Nhân viên xuất phát từ cửa kho `0`, thăm một dãy kệ, lấy đủ hàng, rồi quay lại cửa kho.
 
-**Mục tiêu:** Tối thiểu hóa **tổng quãng đường di chuyển**.
+**Mục tiêu:** tối thiểu hóa tổng quãng đường di chuyển.
 
-### Ràng buộc bài toán
-- `1 <= N <= 50` (số loại sản phẩm)
-- `1 <= M <= 1000` (số kệ hàng)
-- Mỗi kệ chỉ được ghé thăm **tối đa 1 lần**
-- Phải thu gom **đủ** `q[i]` cho mọi loại sản phẩm `i`
-- Không bắt buộc phải thăm toàn bộ kệ (chỉ cần đủ hàng là dừng)
+### Ràng buộc
 
-### Lưu ý quan trọng
-- **Infeasible instance**: Nếu `sum_j Q[i][j] < q[i]` với một số `i` thì bài toán vô nghiệm.
-  Đây là edge case được thiết kế có chủ đích trong dataset.
-- Lời giải là **tập con có thứ tự** của các kệ, không phải hoán vị toàn bộ M kệ.
+- `1 <= N <= 50`
+- `1 <= M <= 1000`
+- Mỗi kệ được ghé tối đa một lần
+- Phải thu gom đủ `q[i]` với mọi `i`
+- Không cần thăm toàn bộ kệ
 
-### Contract chung cho mọi solver
-- Tất cả các thuật toán phải có **điều kiện dừng theo `time_limit`**.
-- Giá trị trả về chuẩn của solver là:
-  - `route`: thứ tự các kho/kệ hàng được thăm
-  - `total_distance`: độ dài quãng đường
-  - `t_best`: thời gian từ lúc bắt đầu chạy đến lúc tìm được nghiệm tốt nhất trong `time_limit`
-- Nếu input **vô nghiệm** thì quy ước trả về là:
-  - `route = []`
-  - `total_distance = -1`
-  - `t_best = -1`
+### Quy ước infeasible
+
+Nếu tồn tại `i` sao cho `sum_j Q[i][j] < q[i]` thì bài toán vô nghiệm.
+
+Khi solver gặp input vô nghiệm:
+
+- `route = []`
+- `total_distance = -1`
+- `t_best = -1`
+
+### Contract chung cho solver
+
+Mọi solver phải hỗ trợ `time_limit` và trả về:
+
+- `route`
+- `total_distance`
+- `t_best`
 
 ---
 
-## 2. Định dạng file dữ liệu (.in)
+## 2. Định dạng file `.in`
 
-```
+```text
 Dòng 1          : N M
-Dòng 2 .. N+1   : N hàng của ma trận Q (mỗi hàng M số nguyên, cách bởi dấu cách)
-Dòng N+2..N+M+2 : (M+1) hàng của ma trận khoảng cách d  ((M+1) x (M+1) số)
+Dòng 2 .. N+1   : N hàng của ma trận Q
+Dòng N+2..N+M+2 : (M+1) hàng của ma trận khoảng cách d
 Dòng N+M+3      : N số nguyên q[1], q[2], ..., q[N]
 ```
 
-**Quy ước index trong code (mixed indexing):**
-- `Q[i][j]`: i=1..N (sản phẩm), j=1..M (kệ) — Q[0] và Q[i][0] là hàng/cột giả
-- `d[i][j]`: i,j=0..M — `d[0]` là cửa kho (point 0), `d[1..M]` là các kệ
-- `q[i]`: i=1..N — q[0] là phần tử giả
+### Quy ước index trong code
 
-**Ví dụ tên file:** `medium_06_N10_M50.in`, `edge_sparse_27_N40_M800.in`
+- `Q[i][j]`: `i = 1..N`, `j = 1..M`
+- `d[i][j]`: `i, j = 0..M`
+- `q[i]`: `i = 1..N`
+
+Ví dụ tên file:
+
+- `medium_06_N10_M50.in`
+- `edge_sparse_27_N40_M800.in`
 
 ---
 
 ## 3. Cấu trúc thư mục
 
-```
+```text
 warehouse-order-picking-optimization/
-├── data/
-│   ├── val_set/           (39 file .in: dùng để tune tham số – Grid Search)
-│   └── test_set/          (39 file .in: dùng để so sánh cuối cùng – fair comparison)
 ├── config/
-│   └── settings.py            (cấu hình hệ thống: TIME_LIMIT_TESTING, runs)
-├── src/
-│   ├── generators/
-│   │   ├── data_generator.py       (sinh 1 file .in qua CLI tương tác)
-│   │   ├── batch_generator.py      (sinh toàn bộ val_set + test_set theo recipe)
-│   │   └── DATA_GENERATOR_NOTE.md  (tài liệu chi tiết về data_generator v2.0.0)
-│   └── solvers/
-│       ├── utils.py                          (read_input, evaluator, validator)
-│       ├── greedy.py                         (Greedy heuristic)
-│       ├── greedy_pruning_pywrapcp.py        (Greedy + Pruning + GLS)
-│       ├── genetic_algorithm.py              (Genetic Algorithm – TODO)
-│       ├── OR_Tools_cp_sat.py                (Exact solver CP-SAT)
-│       └── simulated_annealing/
-│           ├── adaptive_simulated_annealing.py  (Adaptive Simulated Annealing)
-│           ├── phase1.py                        (Batch runner cho Phase 1 của ASA)
-│           └── ALGORITHM_DESCRIPTION.md         (Mô tả chi tiết thuật toán ASA)
+│   └── settings.py
+├── data/
+│   ├── val_set/
+│   └── test_set/
 ├── notebooks/
 │   ├── tuning/
-│   │   ├── simulated_annealing_tuning.ipynb
-│   │   └── genetic_algorithm_tuning.ipynb
+│   │   ├── genetic_algorithm_tuning.ipynb
+│   │   └── simulated_annealing_tuning.ipynb
 │   └── final_evaluation.ipynb
 ├── results/
-│   ├── phase1/         (kết quả representative long-run để chọn time limit chuẩn)
-│   ├── phase2/         (cost reference cho val_set)
-│   ├── phase3/         (kết quả tuning hyperparameter)
-│   ├── phase4/         (cost reference cho test_set)
-│   └── phase5/         (kết quả đánh giá cuối cùng)
-├── requirements.txt
+│   ├── phase1/
+│   ├── phase2/
+│   ├── phase3/
+│   └── phase4/
+├── src/
+│   ├── generators/
+│   ├── solvers/
+│   ├── result_aggregator_common.py
+│   ├── result_aggregator_phase1.py
+│   ├── result_aggregator_phase2.py
+│   └── result_aggregator_phase4.py
+├── CONTEXT.md
+├── PROJECT_ARCHITECTURE.md
 ├── README.md
-└── context.md          (file này)
+├── TESTCASE_CLASSIFICATION.md
+└── requirements.txt
 ```
 
 ---
 
-## 4. Các thuật toán
+## 4. Thuật toán hiện có
 
-### 4.1 Greedy (greedy.py)
-**Loại:** Constructive Heuristic
-**Ý tưởng:** Mỗi bước chọn kệ chưa thăm có tỷ lệ (hàng hữu ích / khoảng cách) tốt nhất.
+### 4.1 Greedy
 
-```
-score(j) = d[cur][j] / useful_amount(j)  -- càng nhỏ càng tốt
-useful_amount(j) = Σ_i min(Q[i][j], còn_cần[i])
-```
+**Thư mục:** `src/solvers/greedy/`
 
-Dừng khi đủ hàng hoặc không còn kệ có ích. Không có tham số tune.
+**Loại:** Constructive heuristic
 
-### 4.2 Greedy + Pruning + pywrapcp (greedy_pruning_pywrapcp.py)
-**Loại:** Heuristic + Local Search | Pipeline 3 bước:
-1. Greedy → lộ trình ban đầu
-2. Pruning (duyệt ngược) → loại kệ thừa không ảnh hưởng khả thi
-3. OR-Tools pywrapcp (Guided Local Search) → tối ưu thứ tự kệ đã chọn
+Ý tưởng: ở mỗi bước chọn kệ có tỷ lệ `distance / useful_amount` tốt nhất.
 
-**Tham số tune:** Dừng theo `time_limit`; khi chạy Phase 1 dùng `TIME_LIMIT_TESTING` trong `config/settings.py`.
+Không có hyperparameter để tune.
 
-### 4.3 Adaptive Simulated Annealing (adaptive_simulated_annealing.py)
-**Loại:** Metaheuristic (Nâng cấp từ SA gốc)
-**Biểu diễn nghiệm:** Hoán vị đầy đủ M kệ, `evaluate_route()` cắt ra route thực tế.
-**Lân cận:** Swap, Insert, 2-Opt với cập nhật trọng số động.
-**Điều kiện dừng:** `time_limit`.
-**Lưu ý:** Operator được bias vào prefix có ảnh hưởng tới route thực tế.
+### 4.2 Greedy + Pruning + pywrapcp
 
-**Tham số tune (val_set):**
-| Tham số | Ý nghĩa | Mặc định tune |
-|---|---|---|
-| alpha | Hệ số làm lạnh cơ sở | 0.99, 0.995, 0.999 |
-| max_no_improve | Vòng không cải thiện để Re-anneal | 1000, 2000, 3000 |
-| reheat_ratio | Tỷ lệ phục hồi nhiệt | 0.2, 0.3, 0.5 |
+**Thư mục:** `src/solvers/greedy_prunning_pywrapcp/`
 
-### 4.4 Genetic Algorithm (genetic_algorithm.py)
-**Loại:** Metaheuristic | **Trạng thái: TODO – chưa implement**
+Pipeline:
 
-### 4.5 OR-Tools CP-SAT (OR_Tools_cp_sat.py)
-**Loại:** Solver dựa trên mô hình exact (CP-SAT)
-**Mô hình:** Biến nhị phân x[j] + arc[i][j] + AddCircuit → chu trình Hamiltonian.
-**Ràng buộc:** Σ_j Q[i][j]*x[j] >= q[i] với mọi i.
-**Tham số:** max_time_in_seconds = theo `time_limit` được truyền cho solver.
-**Lưu ý:** Vì implementation hiện tại vẫn chạy với time limit, CP-SAT có thể trả về nghiệm `FEASIBLE` trước khi chứng minh tối ưu. Do đó không phải mọi lần chạy đều là nghiệm tối ưu tuyệt đối.
+1. Greedy chọn route ban đầu
+2. Pruning loại kệ thừa
+3. `pywrapcp` tối ưu lại thứ tự route
+
+Không có lưới hyperparameter; chỉ phụ thuộc `time_limit`.
+
+### 4.3 CP-SAT
+
+**Thư mục:** `src/solvers/cp_sat/`
+
+**Loại:** exact solver theo time limit
+
+Lưu ý:
+
+- Có thể trả về nghiệm tốt nhất tìm được trong giới hạn thời gian
+- Không phải lúc nào cũng chứng minh tối ưu tuyệt đối nếu hết `time_limit`
+
+### 4.4 Adaptive Simulated Annealing
+
+**Thư mục:** `src/solvers/simulated_annealing/`
+
+**Loại:** metaheuristic
+
+Hyperparameter grid hiện tại:
+
+| Tham số | Giá trị |
+|---|---|
+| `alpha` | `0.99`, `0.995`, `0.999` |
+| `max_no_improve` | `1000`, `2000` |
+| `reheat_ratio` | `0.2`, `0.3`, `0.5` |
+
+### 4.5 Genetic Algorithm
+
+**Thư mục:** `src/solvers/genetic_algorithm/`
+
+**Triển khai:** Python wrapper + C++ core
+
+Hyperparameter grid hiện tại:
+
+| Tham số | Giá trị |
+|---|---|
+| `pop_size` | `100`, `200` |
+| `crossover_rate` | `0.7`, `0.8`, `0.9` |
+| `mutation_rate` | `0.05`, `0.1`, `0.2` |
+
+### 4.6 Ant Colony Optimization
+
+**Thư mục:** `src/solvers/ant_colony/`
+
+**Triển khai:** Python wrapper + C++ core
+
+Hyperparameter grid hiện tại:
+
+| Tham số | Giá trị |
+|---|---|
+| `num_ants` | `50`, `100` |
+| `alpha` | `1.0`, `2.0` |
+| `beta` | `2.0`, `3.0`, `4.0` |
+| `rho` | `0.1` |
 
 ---
 
-## 5. Dataset – Phân nhóm test cases
+## 5. Dataset và phân nhóm testcase
 
-Cả val_set và test_set đều có **39 file** (cùng cấu trúc N/M, số liệu khác hoàn toàn).
+Cả `val_set` và `test_set` đều có 39 file.
 
-**Phân nhóm theo M** (M quyết định độ phức tạp tính toán):
-- **Small:** M ≤ 20
-- **Medium:** 50 ≤ M ≤ 400
-- **Large:** M ≥ 500
+### Nhóm theo `M`
+
+- `small`: `M <= 20`
+- `medium`: `50 <= M <= 400`
+- `large`: `M >= 500`
+
+### Các họ testcase
 
 | Nhóm | Số test | N/M | Mục đích |
 |---|---|---|---|
-| small_01..05 | 5 | N=2..10, M=5..20 | Debug logic bằng tay |
-| medium_06..17 | 12 | N=10..35, M=50..400 | Đánh giá hiệu năng trung bình |
-| large_18..22 | 5 | N=40..50, M=500..1000 | Stress test |
-| edge_N1_23..24 | 2 | N=1, M=300/500 | 1 sản phẩm (gần TSP) |
-| edge_infeas_25..26 | 2 | N=20..30, M=100..200 | Guaranteed infeasible |
-| edge_sparse_27..28 | 2 | N=40..50, M=800..1000 | 90% kệ trống |
-| edge_dense_29..30 | 2 | N=40..50, M=500..1000 | Kho đầy, nhu cầu nhỏ |
-| dist_corner_31..33 | 3 | N=15..50, M=150..800 | Tọa độ tập trung ở 4 góc |
-| dist_cluster_34..36 | 3 | N=15..50, M=150..800 | Tọa độ chia thành K cụm |
-| dist_diagonal_37..39 | 3 | N=15..50, M=150..800 | Tọa độ dọc đường chéo chính |
-
-**Cách batch_generator tạo edge cases:**
-- edge_sparse: Override 90% Q[i][j]=0, còn lại randint(1,5); sinh lại q với feasibility="Y"
-- edge_dense: Override Q[i][j]=randint(1000,5000); q=randint(10,20)
-- edge_infeas: feasibility="N" → q[i] > total_supply → guaranteed infeasible
-
-**Cách batch_generator tạo distribution cases:**
-- dist_corner: `step3_gen_distance_matrix(m, coord_bound, distribution="corner_biased")`
-- dist_cluster: `step3_gen_distance_matrix(m, coord_bound, distribution="clustered")`
-- dist_diagonal: `step3_gen_distance_matrix(m, coord_bound, distribution="diagonal")`
+| `small_01..05` | 5 | N=2..10, M=5..20 | Debug logic |
+| `medium_06..17` | 12 | N=10..35, M=50..400 | Đánh giá trung bình |
+| `large_18..22` | 5 | N=40..50, M=500..1000 | Stress test |
+| `edge_N1_23..24` | 2 | N=1, M=300/500 | Gần TSP |
+| `edge_infeas_25..26` | 2 | N=20..30, M=100..200 | Guaranteed infeasible |
+| `edge_sparse_27..28` | 2 | N=40..50, M=800..1000 | 90% kệ trống |
+| `edge_dense_29..30` | 2 | N=40..50, M=500..1000 | Kho dày |
+| `dist_corner_31..33` | 3 | N=15..50, M=150..800 | Tọa độ ở góc |
+| `dist_cluster_34..36` | 3 | N=15..50, M=150..800 | Tọa độ theo cụm |
+| `dist_diagonal_37..39` | 3 | N=15..50, M=150..800 | Tọa độ theo đường chéo |
 
 ---
 
-## 6. Workflow thực nghiệm
+## 6. Cấu hình thực nghiệm hiện tại
 
-```
+Từ `config/settings.py`:
+
+- `TIME_LIMIT_TESTING`
+  - `small = 30.0`
+  - `medium = 600.0`
+  - `large = 900.0`
+- `TIME_LIMITS`
+  - `small = 18.0`
+  - `medium = 400.0`
+  - `large = 700.0`
+- `SEEDS = [0, 1, 2]`
+- `NUM_RUNS_PER_CONFIG = 3`
+
+Lưu ý:
+
+- Tài liệu cũ từng ghi `k = 10 seed`
+- Repo hiện tại đang chạy thực tế với `k = len(SEEDS) = 3`
+- Nếu cần báo cáo nghiêm túc hơn cho metaheuristic, nên tăng lên ít nhất 10 seed
+
+---
+
+## 7. Workflow thực nghiệm
+
+```text
 batch_generator.py
-  → sinh val_set/ và test_set/
+  -> sinh val_set/ và test_set/
       ↓
-PHASE 1: TÌM TIME LIMIT CHUẨN
-  - Chọn representative cases đủ nhóm small / medium / large
-  - Chạy mỗi thuật toán với cấu hình mặc định trên các testcase này
-  - Dùng TIME_LIMIT_TESTING theo kích thước testcase
-  - Quan sát điểm bão hòa để chốt time budget chuẩn cho từng nhóm
-  - Lưu: results/phase1/<testcase>/<algorithm>.json
-  - JSON gồm: route, total_distance, t_best, time_limit, hyperparameters
+PHASE 1: CHỌN TIME LIMIT
+  - Chạy representative cases
+  - Quan sát saturation của từng thuật toán
+  - Lưu JSON theo từng testcase/algorithm
       ↓
-PHASE 2: FIND BEST KNOWN SOLUTION (BFS) CHO val_set
-  - Tạo cost reference cho toàn bộ val_set
-  - Small dùng nghiệm CP-SAT làm mốc
-  - Medium / large lấy BFS_Cost bằng cách chạy tất cả thuật toán / cấu hình
-  - Thuật toán ngẫu nhiên chạy k = 10 seed, giữ kết quả tốt nhất
-  - Lưu ở results/phase2/
+PHASE 2: BUILD COST REFERENCE CHO val_set
+  - Mục tiêu: tạo best-known cost reference
+  - Small: ưu tiên CP-SAT làm mốc
+  - Medium/large: gom kết quả từ nhiều thuật toán/cấu hình
+  - Với metaheuristic: chạy nhiều seed, lấy cost_min cho từng (testcase, cấu hình)
+  - Aggregator lấy min giữa các thuật toán để tạo cost_reference theo testcase
       ↓
-PHASE 3: HYPERPARAMETER TUNING (val_set)
-  - Tune từng lưới siêu tham số trên val_set
-  - Thuật toán ngẫu nhiên chạy k = 10 seed
-  - Tính min_cost theo testcase, sau đó tính RFD theo cost reference của Phase 2
-  - Chọn cấu hình có avg_RFD nhỏ nhất
-  - Lưu ở results/phase3/<algorithm>.csv
-      ↓ bộ tham số tốt nhất
-PHASE 4: FIND BEST KNOWN SOLUTION (BFS) CHO test_set
-  - Tạo cost reference cho toàn bộ test_set
-  - Small dùng nghiệm CP-SAT làm mốc
-  - Medium / large lấy BFS_Cost bằng cách chạy tất cả thuật toán / cấu hình
-  - Thuật toán ngẫu nhiên chạy k = 10 seed, giữ kết quả tốt nhất
-  - Lưu ở results/phase4/
+PHASE 3: HYPERPARAMETER TUNING TRÊN val_set
+  - Mục tiêu: chọn cấu hình tốt nhất theo hiệu năng kỳ vọng, không theo run may mắn
+  - Với mỗi (testcase, cấu hình), chạy nhiều seed
+  - Tính ít nhất: min_cost, avg_cost, std_cost, avg_t_best
+  - Dùng avg_cost để tính RFD theo cost_reference của Phase 2
+  - Chọn cấu hình có avg_RFD nhỏ nhất theo từng nhóm kích thước
+  - Tie-break khuyến nghị: std_RFD nhỏ hơn, rồi avg_t_best nhỏ hơn
+      ↓
+PHASE 4: BUILD COST REFERENCE CHO test_set
+  - Mục tiêu: tạo best-known cost reference cho đánh giá cuối
+  - Với metaheuristic: tiếp tục dùng cost_min trên nhiều seed
+  - Aggregator lấy min giữa các thuật toán để tạo cost_reference theo testcase
       ↓
 PHASE 5: FINAL EVALUATION
-  - Chạy từng thuật toán với cấu hình tốt nhất từ Phase 3 trên test_set
-  - Thuật toán ngẫu nhiên chạy k = 10 seed
-  - Tính: min_cost, max_cost, avg_cost, std_cost, avg_t_best, RFD
-  - Tổng hợp theo từng testcase, từng nhóm và overall
-  - Lưu:
-      + results/phase5/evaluation_details.csv
-      + results/phase5/summary.csv
+  - Chạy cấu hình tốt nhất từ Phase 3 trên test_set
+  - Với metaheuristic: chạy nhiều seed
+  - Báo cáo: min_cost, max_cost, avg_cost, std_cost, avg_t_best, RFD
+  - Tổng hợp theo testcase, group, overall
 ```
+
+### Quy ước phương pháp luận
+
+- **Phase 2/4** là pha xây `cost_reference`, nên dùng `cost_min` là đúng mục tiêu
+- **Phase 3** là pha chọn hyperparameter, nên không nên xếp hạng cấu hình bằng `cost_min`
+- Nếu Final Evaluation báo cáo `avg_cost/std_cost`, thì Tuning cũng phải dựa trên `avg_cost` để nhất quán
 
 ---
 
-## 7. Hàm utils.py
+## 8. Hướng chọn tham số đúng chuẩn cho Phase 3
 
-### read_input(stream=None) -> (N, M, Q, d, q)
-Đọc dữ liệu từ stdin hoặc file stream. Trả về theo quy ước 1-based.
+Đây là hướng khuyến nghị cho mọi metaheuristic như ASA, GA, ACO.
 
-### evaluator(route, N, M, Q, d, q) -> dict
-Đánh giá chất lượng lời giải. Output dict:
-- total_distance: tổng khoảng cách (cửa → route → cửa)
-- is_valid: route thu đủ hàng không?
-- is_infeasible: bài toán vô nghiệm từ đầu không?
-- collected, shortage, errors: chi tiết từng sản phẩm
+### Mục tiêu
 
-### compute_route_distance(route, d) -> int
-Tính nhanh khoảng cách không cần đánh giá đầy đủ.
+Chọn cấu hình có hiệu năng **tốt trung bình** và **ổn định**, không phải cấu hình có một lần chạy may mắn nhất.
 
-### validator(N, M, Q, d, q) -> dict
-Kiểm tra tính hợp lệ của input data.
-- is_valid: không có lỗi ràng buộc cứng
-- is_feasible: bài toán có thể có nghiệm không
-- errors, warnings
+### Quy trình
 
----
+1. Giữ nguyên `cost_reference` của Phase 2.
+2. Với mỗi `(testcase, configuration)`, chạy `k` seed độc lập.
+3. Lưu raw result theo seed hoặc ít nhất lưu:
+   - `min_cost`
+   - `avg_cost`
+   - `std_cost`
+   - `avg_t_best`
+4. Tính:
+   - `RFD_case = ((avg_cost - cost_reference) / cost_reference) * 100`
+5. Với mỗi configuration, lấy trung bình `RFD_case` trên toàn bộ testcase trong cùng group:
+   - `avg_RFD_group`
+6. Chọn configuration có `avg_RFD_group` nhỏ nhất.
+7. Tie-break:
+   - `std_RFD_group` nhỏ hơn
+   - `avg_t_best_group` nhỏ hơn
 
-## 8. Cách chạy
+### Không nên làm
 
-```bash
-# Chạy solver độc lập (từ src/solvers/)
-python greedy.py < ../../data/val_set/small_01_N2_M5.in
-python simulated_annealing/adaptive_simulated_annealing.py < ../../data/val_set/medium_06_N10_M50.in
-python OR_Tools_cp_sat.py < ../../data/val_set/small_01_N2_M5.in
-python simulated_annealing/phase1.py
+- Không dùng `cost_min` để xếp hạng cấu hình ở Phase 3 nếu Phase 5 báo cáo theo `avg_cost`
+- Không chọn tham số theo single best run rồi sau đó lại kết luận bằng thống kê trung bình
 
-# Sinh dữ liệu (từ src/generators/)
-python data_generator.py     # CLI tương tác
-python batch_generator.py    # Sinh toàn bộ val_set + test_set
-```
+### Khi nào cần rerun
 
-```python
-# Dùng trong notebook (từ notebooks/tuning/)
-import sys
-sys.path.insert(0, '../../src/solvers')
-from utils import read_input, evaluator, validator
-
-with open('../../data/val_set/small_01_N2_M5.in') as f:
-    N, M, Q, d, q = read_input(f)
-
-result = evaluator(route=[3, 1], N=N, M=M, Q=Q, d=d, q=q)
-print(result['total_distance'], result['is_valid'])
-```
+- Nếu chỉ đổi logic tuning từ `cost_min` sang `avg_cost`:
+  - Cần rerun `Phase 3`
+  - Nên rerun `Phase 5`
+  - Không bắt buộc rerun `Phase 2` và `Phase 4`
+- Nếu đổi cả số lượng seed hoặc muốn thay lại `cost_reference`:
+  - Cần rerun thêm `Phase 2` và `Phase 4`
 
 ---
 
-## 9. Dependencies
+## 9. Hàm dùng chung trong `utils.py`
 
-```
-ortools   (CP-SAT và pywrapcp)
-Python >= 3.11
-```
+### `read_input(stream=None) -> (N, M, Q, d, q)`
+
+Đọc input theo quy ước 1-based.
+
+### `evaluator(route, N, M, Q, d, q) -> dict`
+
+Đánh giá lời giải:
+
+- `total_distance`
+- `is_valid`
+- `is_infeasible`
+- `collected`
+- `shortage`
+- `errors`
+
+### `compute_route_distance(route, d) -> int`
+
+Tính tổng distance của route.
+
+### `validator(N, M, Q, d, q) -> dict`
+
+Kiểm tra hợp lệ của input.
 
 ---
 
@@ -296,20 +352,34 @@ Python >= 3.11
 
 | Hạng mục | Trạng thái |
 |---|---|
-| data_generator.py | ✅ Hoàn thiện (v2.0.0) |
-| batch_generator.py | ✅ Hoàn thiện |
-| greedy.py | ✅ Implement xong |
-| greedy_pruning_pywrapcp.py | ✅ Implement xong |
-| adaptive_simulated_annealing.py (ASA) | ✅ Implement xong |
-| simulated_annealing/phase1.py | ✅ Implement xong |
-| genetic_algorithm.py | ❌ Chưa implement |
-| OR_Tools_cp_sat.py | ✅ Implement xong (exact solver) |
-| utils.py (evaluator, validator) | ✅ Implement xong |
-| Phase 2 cost reference script | ⬜ Chưa implement (TODO) |
-| Phase 3 tuning script/notebook | ⬜ Chưa điền code |
-| Phase 4 cost reference script | ⬜ Chưa implement (TODO) |
-| Phase 5 final evaluation script/notebook | ⬜ Chưa điền code |
+| `data_generator.py` | ✅ Hoàn thiện |
+| `batch_generator.py` | ✅ Hoàn thiện |
+| Greedy | ✅ Implement xong |
+| Greedy + Pruning + pywrapcp | ✅ Implement xong |
+| ASA core | ✅ Implement xong |
+| ASA Phase 1 | ✅ Implement xong |
+| ASA Phase 2 | ✅ Implement xong |
+| ASA Phase 3 | ✅ Có script, nhưng hiện đang tune theo `cost_min` |
+| ASA Phase 4 | ✅ Implement xong |
+| GA core + wrapper | ✅ Implement xong |
+| GA Phase 1 | ✅ Implement xong |
+| GA Phase 2 | ✅ Implement xong |
+| GA Phase 4 | ✅ Implement xong |
+| ACO core + wrapper | ✅ Implement xong |
+| ACO Phase 1 | ✅ Implement xong |
+| ACO Phase 2 | ✅ Implement xong |
+| CP-SAT core | ✅ Implement xong |
+| CP-SAT Phase 1 | ✅ Implement xong |
+| CP-SAT Phase 2 | ✅ Có cho `val_set` small/medium |
+| `result_aggregator_phase2.py` | ✅ Implement xong |
+| `result_aggregator_phase4.py` | ✅ Implement xong |
+| Phase 5 evaluation pipeline | ⬜ Chưa hoàn thiện |
+
+### Ghi chú quan trọng
+
+- `PROJECT_ARCHITECTURE.md` và các tài liệu cũ từng mô tả repo theo cấu trúc file phẳng; mô tả đó không còn đúng
+- `results/phase4/` hiện chưa có pipeline đầy đủ cho phần `small` nếu muốn bám chặt workflow lý tưởng dùng CP-SAT làm mốc cho `test_set`
 
 ---
 
-*Cập nhật lần cuối: 2026-05-17*
+*Cập nhật lần cuối: 2026-05-23*

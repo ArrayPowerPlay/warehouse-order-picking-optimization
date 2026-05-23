@@ -1,10 +1,10 @@
 # Cấu trúc Kiến trúc Dự án (Project Architecture)
 
-Tài liệu này mô tả cấu trúc thư mục và vai trò của các thành phần đang thực sự tồn tại trong repo **Warehouse Order Picking Optimization**.
+Tài liệu này mô tả các thành phần đang thực sự tồn tại trong repo và vai trò của chúng trong pipeline thực nghiệm.
 
 ---
 
-## 1. Cấu trúc thư mục tổng quan
+## 1. Cấu trúc tổng quan
 
 ```text
 warehouse-order-picking-optimization/
@@ -20,11 +20,16 @@ warehouse-order-picking-optimization/
 │   └── final_evaluation.ipynb
 ├── results/
 │   ├── phase1/
-│   └── phase2/
+│   ├── phase2/
+│   ├── phase3/
+│   └── phase4/
 ├── src/
 │   ├── generators/
 │   ├── solvers/
-│   └── result_aggregator_phase1.py
+│   ├── result_aggregator_common.py
+│   ├── result_aggregator_phase1.py
+│   ├── result_aggregator_phase2.py
+│   └── result_aggregator_phase4.py
 ├── CONTEXT.md
 ├── PROJECT_ARCHITECTURE.md
 ├── README.md
@@ -34,213 +39,327 @@ warehouse-order-picking-optimization/
 
 ---
 
-## 2. Cấu hình (`config/`)
+## 2. Cấu hình
 
 ### `config/settings.py`
-- File cấu hình toàn cục cho solver và script thực nghiệm.
-- Các biến chính đang dùng:
-  - `TIME_LIMIT_TESTING`: time limit cho Phase 1 theo nhóm `small`, `medium`, `large`
-  - `TIME_LIMITS`: time limit chuẩn cho các pha chạy đầy đủ
-  - `DATA_PATH`: đường dẫn gốc project
-  - `NUM_RUNS_PER_CONFIG`: số lần chạy lặp cho thuật toán ngẫu nhiên
-  - `SEEDS`: danh sách seed mặc định
+
+File cấu hình toàn cục cho solver và các phase.
+
+Các biến chính:
+
+- `TIME_LIMIT_TESTING`: time limit cho Phase 1
+- `TIME_LIMITS`: time limit chuẩn cho các phase chính
+- `DATA_PATH`: đường dẫn gốc project
+- `NUM_RUNS_PER_CONFIG`: hiện là `3`
+- `SEEDS`: hiện là `[0, 1, 2]`
 
 ---
 
-## 3. Dữ liệu (`data/`)
+## 3. Dữ liệu
 
 ### `data/val_set/`
-- Chứa các testcase validation dùng cho Phase 1, Phase 2 và tuning.
-- Tên file bám theo nhóm testcase, ví dụ:
+
+- Dùng cho Phase 1, Phase 2, Phase 3
+- Tên file theo pattern nhóm testcase, ví dụ:
   - `small_01_N2_M5.in`
   - `medium_15_N30_M300.in`
   - `edge_dense_30_N50_M1000.in`
 
 ### `data/test_set/`
-- Chứa các testcase độc lập dùng cho đánh giá cuối.
-- Cấu trúc đặt tên giống `val_set`.
+
+- Dùng cho Phase 4 và Phase 5
+- Cấu trúc tên file tương tự `val_set`
 
 ---
 
-## 4. Mã nguồn sinh dữ liệu (`src/generators/`)
+## 4. Bộ sinh dữ liệu
 
 ### `src/generators/data_generator.py`
-- Generator sinh một testcase `.in`.
-- Hỗ trợ sinh ma trận hàng hóa `Q`, ma trận khoảng cách `d`, nhu cầu `q`, và nhiều kiểu phân bố tọa độ.
+
+- Sinh một testcase `.in`
+- Tạo `Q`, `d`, `q` và các phân bố khoảng cách khác nhau
 
 ### `src/generators/batch_generator.py`
-- Sinh hàng loạt testcase cho `val_set` và `test_set`.
-- Định nghĩa recipe các nhóm `small`, `medium`, `large`, `edge`, và distribution cases.
+
+- Sinh toàn bộ `val_set` và `test_set`
+- Định nghĩa các họ testcase: `small`, `medium`, `large`, `edge`, `distribution`
 
 ### `src/generators/DATA_GENERATOR_NOTE.md`
-- Ghi chú chi tiết cho data generator.
+
+- Ghi chú chi tiết về data generator
 
 ---
 
-## 5. Mã nguồn solver (`src/solvers/`)
+## 5. Solver
 
-### 5.1. File dùng chung
+### 5.1 File dùng chung
 
 ### `src/solvers/utils.py`
-- Tiện ích chung cho toàn bộ solver.
-- Các hàm chính:
-  - `read_input()`
-  - `evaluator()`
-  - `compute_route_distance()`
-  - `validator()`
 
-### `src/solvers/phase1_edge_large_cpsat_pywrapcp.py`
-- Runner bổ sung cho Phase 1.
-- Dùng để chạy:
-  - `cpsat` cho representative edge và large cases
-  - `pywrapcp` cho representative edge cases
-- Đọc input từ `data/val_set/` và ghi đè output vào `results/phase1/<testcase>/`.
+Các hàm dùng chung:
 
-### 5.2. Greedy
+- `read_input()`
+- `evaluator()`
+- `compute_route_distance()`
+- `validator()`
+
+### 5.2 Greedy
 
 Thư mục: `src/solvers/greedy/`
 
-### `src/solvers/greedy/greedy.py`
-- Thuật toán Greedy cơ bản.
-- Xây route bằng cách chọn kệ có tỷ lệ lợi ích/khoảng cách tốt nhất ở mỗi bước.
+#### `greedy.py`
 
-### `src/solvers/greedy/phase1_greedy.py`
-- Runner Phase 1 cho Greedy.
-- Ghi kết quả `greedy.json` vào `results/phase1/<testcase>/`.
+- Greedy cơ bản
 
-### 5.3. Greedy + Pruning + pywrapcp
+#### `phase1_greedy.py`
+
+- Runner Phase 1 cho Greedy
+
+#### `phase2_greedy.py`
+
+- Runner Phase 2 cho Greedy trên `val_set`
+- Lưu `cost_min` theo testcase
+
+### 5.3 Greedy + Pruning + pywrapcp
 
 Thư mục: `src/solvers/greedy_prunning_pywrapcp/`
 
-Lưu ý: tên thư mục hiện tại trong code là `prunning` theo chính tả đang dùng của repo.
+#### `greedy_prunning_pywrapcp.py`
 
-### `src/solvers/greedy_prunning_pywrapcp/greedy_prunning_pywrapcp.py`
-- Pipeline 3 bước:
-  - Greedy chọn tập kệ ban đầu
-  - Pruning loại kệ thừa
-  - `pywrapcp` tối ưu lại thứ tự route bằng Guided Local Search
-- Trả về `route`, `total_distance`, `t_best`.
+- Pipeline Greedy -> Pruning -> `pywrapcp`
 
-### `src/solvers/greedy_prunning_pywrapcp/phase1_greedy_prunning_pywrapcp.py`
-- Runner Phase 1 cho solver pywrapcp.
-- Ghi `pywrapcp.json` vào `results/phase1/<testcase>/`.
+#### `phase1_greedy_prunning_pywrapcp.py`
 
-### 5.4. CP-SAT
+- Runner Phase 1
+
+#### `phase2_greedy_prunning_pywrapcp.py`
+
+- Runner Phase 2 trên `val_set`
+- Lưu `cost_min` theo testcase
+
+### 5.4 CP-SAT
 
 Thư mục: `src/solvers/cp_sat/`
 
-### `src/solvers/cp_sat/cp_sat.py`
-- Solver CP-SAT dùng OR-Tools.
-- Mô hình hóa chọn kệ và chu trình bằng biến nhị phân và `AddCircuit`.
-- Có kiểm tra nhanh trường hợp vô nghiệm trước khi build model.
+#### `cp_sat.py`
 
-### `src/solvers/cp_sat/phase1_cp_sat.py`
-- Runner Phase 1 cho CP-SAT.
-- Ghi `cpsat.json` vào `results/phase1/<testcase>/`.
+- Solver CP-SAT dùng OR-Tools
+- Có kiểm tra infeasible trước khi build model
 
-### 5.5. Simulated Annealing
+#### `phase1_cp_sat.py`
+
+- Runner Phase 1
+
+#### `phase2_cp_sat.py`
+
+- Runner Phase 2 cho `val_set`
+- Hiện chỉ chạy `small` và `medium`
+- Bỏ qua `large`
+- Ghi `cpsat.csv` vào `results/phase2/`
+
+### 5.5 Adaptive Simulated Annealing
 
 Thư mục: `src/solvers/simulated_annealing/`
 
-### `src/solvers/simulated_annealing/adaptive_simulated_annealing.py`
-- Solver Adaptive Simulated Annealing (ASA).
-- Dừng theo `time_limit`.
-- Có bộ tham số mặc định và cơ chế reheat.
+#### `adaptive_simulated_annealing.py`
 
-### `src/solvers/simulated_annealing/phase1.py`
-- Runner Phase 1 cho ASA.
-- Ghi `asa.json` vào `results/phase1/<testcase>/`.
+- Solver ASA
+- Dừng theo `time_limit`
+- Có cơ chế reheat
 
-### `src/solvers/simulated_annealing/phase2.py`
-- Script phục vụ Phase 2 cho ASA.
-- Dùng để chạy trên tập dữ liệu lớn hơn Phase 1, hướng tới thu cost reference.
+#### `phase1.py`
 
-### `src/solvers/simulated_annealing/ALGORITHM_DESCRIPTION.md`
-- Mô tả chi tiết ý tưởng và operator của ASA.
+- Runner Phase 1
 
-### 5.6. Genetic Algorithm
+#### `phase2.py`
+
+- Runner Phase 2 trên `val_set`
+- Với mỗi `(testcase, cấu hình)`, chạy toàn bộ `SEEDS`
+- Lưu `cost_min`
+
+#### `phase3.py`
+
+- Tuning tham số ASA trên `val_set`
+- Hiện đang đọc kết quả Phase 2 và tính `avg_RFD` từ `cost_min`
+- Đây là điểm cần đổi nếu muốn tune theo hiệu năng trung bình
+
+#### `phase4.py`
+
+- Runner Phase 4 trên `test_set`
+- Với mỗi `(testcase, cấu hình)`, chạy toàn bộ `SEEDS`
+- Lưu `cost_min`
+
+#### `ALGORITHM_DESCRIPTION.md`
+
+- Mô tả chi tiết thuật toán ASA
+
+### 5.6 Genetic Algorithm
 
 Thư mục: `src/solvers/genetic_algorithm/`
 
-### `src/solvers/genetic_algorithm/ga.py`
-- Python wrapper cho core GA viết bằng C++.
-- Gọi file thực thi `ga_core.exe` hoặc `ga_core`.
+#### `ga.py`
 
-### `src/solvers/genetic_algorithm/ga_core.cpp`
-- C++ core của Genetic Algorithm.
+- Python wrapper cho core GA
 
-### `src/solvers/genetic_algorithm/phase1_ga.py`
-- Runner Phase 1 cho GA.
-- Ghi `ga.json` vào `results/phase1/<testcase>/`.
+#### `ga_core.cpp`
 
-### 5.7. Ant Colony Optimization
+- C++ core của GA
+
+#### `phase1_ga.py`
+
+- Runner Phase 1
+
+#### `phase2.py`
+
+- Runner Phase 2 trên `val_set`
+- Với mỗi `(testcase, cấu hình)`, chạy toàn bộ `SEEDS`
+- Lưu `cost_min`
+
+#### `phase4.py`
+
+- Runner Phase 4 trên `test_set`
+- Với mỗi `(testcase, cấu hình)`, chạy toàn bộ `SEEDS`
+- Lưu `cost_min`
+
+### 5.7 Ant Colony Optimization
 
 Thư mục: `src/solvers/ant_colony/`
 
-### `src/solvers/ant_colony/aco.py`
-- Python wrapper cho core ACO viết bằng C++.
-- Gọi file thực thi `aco_core.exe` hoặc `aco_core`.
+#### `aco.py`
 
-### `src/solvers/ant_colony/aco_core.cpp`
-- C++ core của Ant Colony Optimization.
+- Python wrapper cho core ACO
 
-### `src/solvers/ant_colony/phase1_aco.py`
-- Runner Phase 1 cho ACO.
-- Ghi `aco.json` vào `results/phase1/<testcase>/`.
+#### `aco_core.cpp`
+
+- C++ core của ACO
+
+#### `phase1_aco.py`
+
+- Runner Phase 1
+
+#### `phase2_aco.py`
+
+- Runner Phase 2 trên `val_set`
+- Với mỗi `(testcase, cấu hình)`, chạy toàn bộ `SEEDS`
+- Lưu `cost_min`
 
 ---
 
 ## 6. Script tổng hợp kết quả
 
+### `src/result_aggregator_common.py`
+
+- Helper dùng chung cho Phase 2 và Phase 4
+- Đọc cột `cost_min` từ các file CSV của thuật toán
+- Lấy min theo `testcase` để tạo `cost_reference`
+
 ### `src/result_aggregator_phase1.py`
-- Quét các thư mục con trong `results/phase1/`.
-- Đọc các file JSON theo từng thuật toán.
-- Tổng hợp `t_best` và `time_limit` thành `results/phase1/aggregate_results.csv`.
+
+- Tổng hợp các JSON trong `results/phase1/`
+- Xuất `aggregate_results.csv`
+
+### `src/result_aggregator_phase2.py`
+
+- Tổng hợp các CSV trong `results/phase2/`
+- Xuất `results/phase2/aggregate_result.csv`
+
+### `src/result_aggregator_phase4.py`
+
+- Tổng hợp các CSV trong `results/phase4/`
+- Xuất `results/phase4/aggregate_result.csv`
 
 ---
 
-## 7. Notebooks
+## 7. Notebook
 
 ### `notebooks/tuning/simulated_annealing_tuning.ipynb`
-- Notebook tuning cho ASA trên `val_set`.
+
+- Notebook tuning cho ASA
 
 ### `notebooks/tuning/genetic_algorithm_tuning.ipynb`
-- Notebook tuning cho GA.
+
+- Notebook tuning cho GA
 
 ### `notebooks/final_evaluation.ipynb`
-- Notebook phục vụ đánh giá tổng hợp và so sánh cuối cùng.
+
+- Notebook phục vụ tổng hợp và trực quan hóa cuối
 
 ---
 
-## 8. Kết quả thực nghiệm (`results/`)
+## 8. Thư mục kết quả
 
 ### `results/phase1/`
-- Đang được dùng để lưu kết quả representative runs cho Phase 1.
-- Mỗi testcase có một thư mục riêng, ví dụ:
-  - `results/phase1/small_04_N5_M20/`
-  - `results/phase1/medium_15_N30_M300/`
-  - `results/phase1/large_21_N50_M1000/`
-  - `results/phase1/edge_N1_24_N1_M500/`
-- Trong mỗi thư mục có các file JSON theo thuật toán:
+
+- Kết quả representative runs
+- Mỗi testcase có một thư mục riêng
+- Bên trong chứa JSON theo thuật toán:
   - `greedy.json`
   - `pywrapcp.json`
   - `cpsat.json`
   - `asa.json`
   - `ga.json`
   - `aco.json`
-- Ngoài ra có:
-  - `results/phase1/aggregate_results.csv`
+- Có thêm:
+  - `aggregate_results.csv`
 
 ### `results/phase2/`
-- Thư mục đã được tạo nhưng hiện chưa thấy file kết quả trong repo.
-- Dự kiến dùng để lưu cost reference hoặc kết quả chạy giai đoạn tiếp theo.
+
+- Kết quả Phase 2 trên `val_set`
+- Hiện có các file:
+  - `greedy.csv`
+  - `pywrapcp.csv`
+  - `cpsat.csv`
+  - `asa.csv`
+  - `ga.csv`
+  - `aco.csv`
+  - `aggregate_result.csv`
+
+### `results/phase3/`
+
+- Kết quả tuning
+- Hiện có:
+  - `asa.csv`
+
+### `results/phase4/`
+
+- Kết quả Phase 4 trên `test_set`
+- Hiện có:
+  - `asa.csv`
+  - `ga.csv`
+  - `aggregate_result.csv`
+
+Lưu ý:
+
+- Phase 4 hiện chưa có pipeline CP-SAT tương ứng cho phần `small` của `test_set`
+- Vì vậy `cost_reference` ở `results/phase4/aggregate_result.csv` chưa phản ánh đầy đủ workflow lý tưởng dùng CP-SAT làm mốc cho `small`
 
 ---
 
-## 9. Ghi chú về trạng thái hiện tại
+## 9. Trạng thái phương pháp luận
 
-- Repo hiện đã tổ chức solver theo từng package con trong `src/solvers/`, không còn cấu trúc file phẳng như một số tài liệu cũ mô tả.
-- CP-SAT hiện nằm ở `src/solvers/cp_sat/`, không phải `OR_Tools_cp_sat.py`.
-- Greedy hiện nằm ở `src/solvers/greedy/greedy.py`.
-- Solver pywrapcp hiện nằm ở `src/solvers/greedy_prunning_pywrapcp/greedy_prunning_pywrapcp.py`.
-- `results/` hiện mới có `phase1/` và `phase2/`; các thư mục phase sau chưa xuất hiện trong repo hiện tại.
+### Điều đang đúng
+
+- Phase 2 và Phase 4 đang đúng vai trò **best known reference**
+- Metaheuristic chạy nhiều seed rồi lưu `cost_min`
+- Aggregator lấy min giữa các thuật toán để tạo `cost_reference`
+
+### Điều cần chỉnh
+
+- Phase 3 của ASA hiện đang tune theo `cost_min`
+- Nếu mục tiêu Final Evaluation là báo cáo `avg_cost`, `std_cost`, `avg_t_best`, thì tuning bằng `cost_min` là không nhất quán
+
+### Hướng nên làm ở Phase 3
+
+1. Giữ nguyên `cost_reference` từ Phase 2
+2. Với mỗi `(testcase, configuration)`, chạy nhiều seed
+3. Tính `avg_cost` và `std_cost`
+4. Tính `RFD` bằng `avg_cost` so với `cost_reference`
+5. Chọn cấu hình có `avg_RFD` nhỏ nhất theo group
+6. Dùng `std_RFD` và `avg_t_best` làm tie-break
+
+Nếu chỉ đổi logic tuning, phần cần rerun trước hết là:
+
+- `Phase 3`
+- `Phase 5`
+
+Không bắt buộc rerun `Phase 2` và `Phase 4` nếu vẫn giữ định nghĩa `cost_reference` là best-known cost.
