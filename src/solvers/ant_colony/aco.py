@@ -5,6 +5,7 @@ The solver stops by time limit and returns:
     route, total_distance, t_best
 """
 import argparse
+import io  # --- THÊM VÀO: Dùng để đọc chuỗi thành luồng giống ga.py ---
 import os
 import sys
 import subprocess
@@ -13,6 +14,8 @@ import subprocess
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../.."))
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
+
+from src.solvers.utils import read_input  # --- THÊM VÀO: Import hàm đọc dữ liệu ---
 
 # Các tham số mặc định cho ACO
 DEFAULT_TIME_LIMIT = 5.0
@@ -27,6 +30,7 @@ def aco_solver(
     alpha: float = DEFAULT_ALPHA,
     beta: float = DEFAULT_BETA,
     rho: float = DEFAULT_RHO,
+    seed: int | None = None, # --- THÊM VÀO: Thêm tham số seed ---
 ):
     """Run ACO (C++ core) and return route, total distance, and t_best."""
     
@@ -38,11 +42,23 @@ def aco_solver(
         if not os.path.exists(cpp_executable):
             raise FileNotFoundError(f"Không tìm thấy file thực thi C++: {cpp_executable}. Vui lòng biên dịch trước!")
 
-    # Đọc dữ liệu từ luồng chuẩn (do phase1.py bơm vào)
+    # Đọc dữ liệu từ luồng chuẩn (do phase1.py hoặc phase2_aco.py bơm vào)
     input_data = sys.stdin.read()
     
     if not input_data.strip():
          return [], 0, 0.0
+
+    # ========================================================
+    # --- THÊM VÀO: CHỐT CHẶN Ở TẦNG PYTHON GIỐNG ga.py ---
+    # ========================================================
+    N, M, Q, _, q = read_input(io.StringIO(input_data))
+    if sum(q) == 0:
+        return [], 0, 0.0
+
+    for item_idx in range(1, N + 1):
+        if sum(Q[item_idx][shelf_idx] for shelf_idx in range(1, M + 1)) < q[item_idx]:
+            return [], -1, -1.0
+    # ========================================================
 
     # Đóng gói tham số truyền qua Command Line cho C++
     args = [
@@ -53,6 +69,10 @@ def aco_solver(
         str(beta),
         str(rho)
     ]
+
+    # --- THÊM VÀO: Nếu có truyền seed thì đẩy tham số này xuống cho C++ xử lý ---
+    if seed is not None:
+        args.append(str(seed))
 
     # Cờ ẩn cửa sổ Command Prompt trên Windows
     creation_flags = 0
@@ -97,6 +117,7 @@ if __name__ == "__main__":
     parser.add_argument("--alpha", type=float, default=DEFAULT_ALPHA)
     parser.add_argument("--beta", type=float, default=DEFAULT_BETA)
     parser.add_argument("--rho", type=float, default=DEFAULT_RHO)
+    parser.add_argument("--seed", type=int, default=None) # --- THÊM VÀO: Nhận flag seed từ tham số dòng lệnh ---
     args = parser.parse_args()
 
     best_route, best_distance, t_best = aco_solver(
@@ -105,6 +126,7 @@ if __name__ == "__main__":
         alpha=args.alpha,
         beta=args.beta,
         rho=args.rho,
+        seed=args.seed, # --- THÊM VÀO: Truyền giá trị seed vào hàm solver ---
     )
 
     print(best_route)

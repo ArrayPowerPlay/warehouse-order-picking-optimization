@@ -7,17 +7,15 @@
 using namespace std;
 using namespace std::chrono;
 
-// Các tham số - ĐÃ BỎ CONST ĐỂ NHẬN TỪ PYTHON
+// Các tham số
 int NUM_ANTS = 100;      
-// int MAX_ITER = 500; // Không dùng MAX_ITER làm điều kiện dừng chính nữa
 double ALPHA = 1.0;      
 double BETA = 3.0;       
 double RHO = 0.1;        
 const double INITIAL_PHERO = 1.0; // Lượng mùi khởi tạo (Giữ nguyên)
 
-// --- THÊM VÀO: Biến lưu giới hạn thời gian ---
+// Biến lưu giới hạn thời gian
 double TIME_LIMIT = 900.0; 
-// ---------------------------------------------
 
 int N, M;
 vector<vector<int>> Q_mat; 
@@ -36,17 +34,10 @@ int main(int argc, char* argv[]) {
     ios_base::sync_with_stdio(false);
     cin.tie(NULL);
 
-    /* --- COMMENT LẠI THEO YÊU CẦU: Nhận tham số kiểu mới từ Python ---
-    if (argc >= 6) {
-        NUM_ANTS = atoi(argv[1]);
-        MAX_ITER = atoi(argv[2]);
-        ALPHA = atof(argv[3]);
-        BETA = atof(argv[4]);
-        RHO = atof(argv[5]);
-    }
-    ------------------------------------------------------------------*/
+    // --- SỬA Ở ĐÂY: Khởi tạo Seed mặc định ---
+    unsigned int RNG_SEED = static_cast<unsigned int>(random_device{}());
 
-    // --- THÊM VÀO: Đọc tham số từ aco.py truyền sang ---
+    // Đọc tham số từ aco.py truyền sang
     if (argc >= 6) {
         TIME_LIMIT = atof(argv[1]);
         NUM_ANTS = atoi(argv[2]);
@@ -54,15 +45,15 @@ int main(int argc, char* argv[]) {
         BETA = atof(argv[4]);
         RHO = atof(argv[5]);
     }
-    // ---------------------------------------------------
-
-    /* --- COMMENT LẠI THEO YÊU CẦU: Để Python pipe dữ liệu vào cin ---
-    #define Task "B"
-    if (fopen(Task".inp", "r")){
-        freopen(Task".inp", "r", stdin);
-        // freopen(Task".out", "w", stdout); 
+    // --- SỬA Ở ĐÂY: Đọc Seed từ Python nếu có truyền tham số thứ 6 ---
+    if (argc >= 7) {
+        RNG_SEED = static_cast<unsigned int>(strtoul(argv[6], nullptr, 10));
     }
-    -----------------------------------------------------------------*/
+    
+    // --- SỬA Ở ĐÂY: Khởi tạo bộ sinh số ngẫu nhiên với Seed được truyền vào ---
+    mt19937 rng(RNG_SEED);
+    uniform_real_distribution<double> dist_real(0.0, 1.0);
+    // ---------------------------------------------------
 
     if (!(cin >> N >> M)) return 0; // Check luồng dữ liệu an toàn
 
@@ -88,13 +79,43 @@ int main(int argc, char* argv[]) {
     phero.assign(M + 1, vector<double>(M + 1, INITIAL_PHERO));
     global_best_ant.length = 1e18; 
 
-    mt19937 rng(random_device{}());
-    uniform_real_distribution<double> dist_real(0.0, 1.0);
+    // --- SỬA Ở ĐÂY: ĐÃ XÓA 2 dòng khởi tạo mt19937 rng(random_device{}()) cũ ở đây ---
 
-    /* --- COMMENT LẠI THEO YÊU CẦU ---
-    ofstream file_out("aco_convergence.csv");
-    file_out << "Iteration,Best_Cost,Average_Cost,Std_Dev\n";
-    -----------------------------------*/
+    // ========================================================
+    // --- THÊM VÀO: CHỐT CHẶN KIỂM TRA DỮ LIỆU HỢP LỆ ---
+    // ========================================================
+    long long total_required = 0;
+    for (int i = 0; i < N; ++i) {
+        total_required += q_req[i];
+    }
+
+    // 1. Nếu đơn hàng trống
+    if (total_required == 0) {
+        cout << "0 0.0000\n"; // Dòng 1: Cost = 0, Time = 0
+        cout << "\n";         // Dòng 2: Route trống
+        return 0;             // Kết thúc chương trình luôn
+    }
+
+    // 2. Kiểm tra xem kho có đủ hàng không
+    bool is_feasible = true;
+    for (int i = 0; i < N; ++i) {
+        long long total_in_warehouse = 0;
+        for (int j = 1; j <= M; ++j) {
+            total_in_warehouse += Q_mat[i][j];
+        }
+        if (total_in_warehouse < q_req[i]) {
+            is_feasible = false;
+            break;
+        }
+    }
+
+    // Nếu thiếu hàng
+    if (!is_feasible) {
+        cout << "-1 -1.0000\n"; // Dòng 1: Cost = -1, Time = -1
+        cout << "\n";           // Dòng 2: Route trống
+        return 0;               // Kết thúc chương trình luôn
+    }
+    // ========================================================
 
     auto start_time = high_resolution_clock::now();
     double t_best = 0.0;
@@ -102,11 +123,7 @@ int main(int argc, char* argv[]) {
     auto initial_time = high_resolution_clock::now();
     t_best = duration<double>(initial_time - start_time).count();
 
-    /* --- COMMENT LẠI: Chuyển sang chạy theo thời gian ---
-    for (int iter = 0; iter < MAX_ITER; ++iter) {
-    -----------------------------------------------------*/
-
-    // --- THÊM VÀO: Vòng lặp chạy liên tục theo Time Limit ---
+    // Vòng lặp chạy liên tục theo Time Limit
     int iter = 0;
     while(true) {
         // Kiểm tra đồng hồ sau mỗi 10 vòng lặp
@@ -117,7 +134,6 @@ int main(int argc, char* argv[]) {
                 break; // Thoát thuật toán khi hết giờ
             }
         }
-    // --------------------------------------------------------
 
         vector<Ant> ants(NUM_ANTS);
         long long current_iteration_best = 1e18; 
@@ -131,7 +147,7 @@ int main(int argc, char* argv[]) {
 
             visited[0] = true;
 
-            // Cờ bắt lỗi kiến lười (Đã bảo tồn)
+            // Cờ bắt lỗi kiến lười
             bool is_valid_path = false;
 
             while (true) {
@@ -171,6 +187,7 @@ int main(int argc, char* argv[]) {
 
                 if (sum_probs == 0.0) break;
 
+                // --- Sử dụng rng đã được khởi tạo bằng seed ---
                 double rand_val = dist_real(rng) * sum_probs;
                 double cumulative = 0.0;
                 int next_node = -1;
@@ -201,7 +218,7 @@ int main(int argc, char* argv[]) {
                 ants[k].length += d[current_node][0];
             }
 
-            // --- SỬA Ở ĐÂY: Chỉ cho kiến hợp lệ đua top ---
+            // Chỉ cho kiến hợp lệ đua top
             if (is_valid_path) {
                 total_cost_this_iter += ants[k].length;
                 if (ants[k].length < current_iteration_best && !ants[k].path.empty()) {
@@ -211,29 +228,14 @@ int main(int argc, char* argv[]) {
                 if (ants[k].length < global_best_ant.length && !ants[k].path.empty()) {
                     global_best_ant = ants[k];
 
-                    // --- THÊM VÀO: Cập nhật t_best ---
+                    // Cập nhật t_best
                     auto update_time = high_resolution_clock::now();
                     t_best = duration<double>(update_time - start_time).count();
-                    // ---------------------------------
                 }
             } else {
                 ants[k].length = 1e18; // Kiến lười bị loại
             }
         }
-
-        /* --- COMMENT LẠI THEO YÊU CẦU: Không in file csv/txt mỗi vòng lặp ---
-        double avg_cost = (double)total_cost_this_iter / NUM_ANTS;
-        double variance = 0.0;
-        for (int k = 0; k < NUM_ANTS; ++k) {
-            variance += (ants[k].length - avg_cost) * (ants[k].length - avg_cost);
-        }
-        variance /= NUM_ANTS;
-        double std_dev = sqrt(variance);
-
-        if (iter % 10 == 0 || iter == MAX_ITER - 1) {
-            file_out << iter << "," << global_best_ant.length << "," << avg_cost << "," << std_dev << "\n";
-        }
-        ---------------------------------------------------------------------*/
 
         // Cập nhật Pheromone
         for (int i = 0; i <= M; ++i) {
@@ -259,24 +261,16 @@ int main(int argc, char* argv[]) {
         iter++;
     }
 
-    /* --- COMMENT LẠI THEO YÊU CẦU ---
-    file_out.close();
-    auto end_total = high_resolution_clock::now();
-    auto duration_total = duration_cast<milliseconds>(end_total - start_total).count();
-    cout << global_best_ant.length << " " << duration_total << "\n";
-    -----------------------------------*/
-
-    // --- THÊM VÀO: IN RA CHUẨN ĐỂ aco.py ĐỌC DỄ DÀNG ---
+    // IN RA CHUẨN ĐỂ aco.py ĐỌC DỄ DÀNG
     // Dòng 1: Cost và t_best
     cout << global_best_ant.length << " " << fixed << setprecision(4) << t_best << "\n";
     
     // Dòng 2: Lộ trình (Route) - Tự động thêm điểm 0 ở đầu và cuối
-    cout << "0 ";
+    //cout << "0 ";
     for (size_t i = 0; i < global_best_ant.path.size(); ++i) {
         cout << global_best_ant.path[i] << " ";
     }
-    cout << "0\n";
-    // ------------------------------------------
+    //cout << "0\n";
 
     return 0;
 }
