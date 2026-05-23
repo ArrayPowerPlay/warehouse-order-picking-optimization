@@ -4,6 +4,7 @@ dist_corner_31_N15_M150,17713
 dist_diagonal_38_N30_M300,48517
 edge_N1_24_N1_M500,168739
 edge_dense_30_N50_M1000,672
+edge_infeas_26_N30_M200,-1
 edge_sparse_27_N40_M800,437344
 large_19_N40_M800,402636
 large_21_N50_M1000,566872
