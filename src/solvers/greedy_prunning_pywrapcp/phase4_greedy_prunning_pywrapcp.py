@@ -10,8 +10,8 @@ from config.settings import TIME_LIMITS
 from src.solvers.greedy_prunning_pywrapcp.greedy_prunning_pywrapcp import pywrapcp_solver
 from src.solvers.utils import read_input
 
-VAL_SET_ROOT = os.path.join(project_root, "data", "val_set")
-PHASE2_ROOT = os.path.join(project_root, "results", "phase2")
+TEST_SET_ROOT = os.path.join(project_root, "data", "test_set")
+PHASE4_ROOT = os.path.join(project_root, "results", "phase4")
 
 def classify_testcase_size(m: int) -> str:
     if m <= 20: return "small"
@@ -20,30 +20,28 @@ def classify_testcase_size(m: int) -> str:
     raise ValueError(f"Cannot classify testcase with M={m}.")
 
 def main() -> None:
-    print("BẮT ĐẦU CHẠY PHASE 2: PYWRAPCP")
+    print("BẮT ĐẦU CHẠY PHASE 4: PYWRAPCP")
     
-    os.makedirs(PHASE2_ROOT, exist_ok=True)
-    csv_path = os.path.join(PHASE2_ROOT, "pywrapcp.csv")
+    os.makedirs(PHASE4_ROOT, exist_ok=True)
+    csv_path = os.path.join(PHASE4_ROOT, "pywrapcp.csv")
     
     with open(csv_path, mode="w", newline="", encoding="utf-8") as f:
         writer = csv.writer(f)
         writer.writerow(["testcase", "metaheuristic", "cost_min"])
         
-    for filename in sorted(os.listdir(VAL_SET_ROOT)):
+    # Đọc từ TEST_SET_ROOT
+    for filename in sorted(os.listdir(TEST_SET_ROOT)):
         if not filename.endswith(".in"):
             continue
             
         testcase_name = filename.replace(".in", "")
-        input_path = os.path.join(VAL_SET_ROOT, filename)
+        input_path = os.path.join(TEST_SET_ROOT, filename)
         
         with open(input_path, encoding="utf-8") as stream:
             _, m, _, _, _ = read_input(stream)
             
         size_bucket = classify_testcase_size(m)
         
-        # =========================================================
-        # BỎ QUA TESTCASE SMALL 
-        # =========================================================
         if size_bucket == "small":
             print(f"Bỏ qua SMALL: {testcase_name}")
             continue
@@ -66,7 +64,7 @@ def main() -> None:
             
         # Log terminal
         if total_distance != -1:
-            print(f"Cost_min = {total_distance} ")
+            print(f"Cost_min = {total_distance}")
         else:
             print(f"Không tìm được nghiệm cho {testcase_name}")
             

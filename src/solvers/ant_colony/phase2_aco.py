@@ -1,12 +1,10 @@
 """
-Phase 2 runner for Ant Colony Optimization (ACO).
+Phase 2 detail runner for Ant Colony Optimization (ACO).
 
 This script scans all val_set testcases, skips small instances, runs the ACO
 hyperparameter grid on medium/large instances, repeats each configuration on
-all configured seeds, and writes results/phase2/aco.csv.
-
-Rows are appended immediately after each finished (testcase, configuration) 
-so progress is visible during long runs.
+all configured seeds, and writes one detail row per seed to
+results/phase2/aco_detail.csv.
 """
 from __future__ import annotations
 
@@ -22,19 +20,15 @@ project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../..
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
-# --- SỬA Ở ĐÂY: Import SEEDS từ cấu hình hệ thống ---
 from config.settings import SEEDS, TIME_LIMITS
-
-# LƯU Ý: Đảm bảo đường dẫn import này khớp với thư mục dự án của bạn
 from src.solvers.ant_colony.aco import aco_solver
 from src.solvers.utils import read_input
 
 
 VAL_SET_ROOT = os.path.join(project_root, "data", "val_set")
 PHASE2_ROOT = os.path.join(project_root, "results", "phase2")
-DEFAULT_OUTPUT_PATH = os.path.join(PHASE2_ROOT, "aco.csv")
+DEFAULT_OUTPUT_PATH = os.path.join(PHASE2_ROOT, "aco_detail.csv")
 
-# Lưới siêu tham số mẫu cho ACO (điều chỉnh tùy bài toán thực tế)
 NUM_ANTS_GRID = (50, 100)
 ALPHA_GRID = (1.0, 2.0)
 BETA_GRID = (2.0, 3.0, 4.0)
@@ -46,7 +40,8 @@ FIELDNAMES = [
     "alpha",
     "beta",
     "rho",
-    "cost_min",
+    "k",
+    "cost",
 ]
 
 
@@ -62,7 +57,7 @@ def classify_testcase_size(m: int) -> str:
 
 
 def iter_hyperparameter_grid() -> list[tuple[int, float, float, float]]:
-    """Return the fixed ACO grid used for Phase 2."""
+    """Return the fixed ACO grid used for Phase 2 / 3."""
     return list(product(NUM_ANTS_GRID, ALPHA_GRID, BETA_GRID, RHO_GRID))
 
 
@@ -91,7 +86,6 @@ def discover_val_testcases(selected_testcases: set[str] | None = None) -> list[t
     return testcases
 
 
-# --- SỬA Ở ĐÂY: Thêm thuộc tính seed và đặt tên giống GA ---
 def run_single_seed(
     input_path: str,
     time_limit: float,
@@ -112,7 +106,7 @@ def run_single_seed(
                 alpha=alpha,
                 beta=beta,
                 rho=rho,
-                seed=seed, # Truyền seed qua aco_solver
+                seed=seed,
             )
         finally:
             sys.stdin = original_stdin
@@ -120,96 +114,53 @@ def run_single_seed(
     return total_distance
 
 
-# --- SỬA Ở ĐÂY: Thêm hàm chọn best seed giống hệt GA ---
-def select_best_seed(run_results: list[tuple[int, int]]) -> tuple[int, int | None]:
-    """
-    Select the best seed result for one configuration.
-
-    Each item in run_results is (seed, total_distance).
-    If at least one feasible result exists, choose the minimum feasible cost and
-    its seed. If all results are infeasible, return (-1, None).
-    """
-    feasible_results = [(seed, cost) for seed, cost in run_results if cost >= 0]
-    if not feasible_results:
-        return -1, None
-
-    best_seed, best_cost = min(feasible_results, key=lambda item: (item[1], item[0]))
-    return best_cost, best_seed
-
-
-def run_single_configuration(
-    testcase_name: str,
-    input_path: str,
-    time_limit: float,
-    num_ants: int,
-    alpha: float,
-    beta: float,
-    rho: float,
-) -> dict[str, object]:
-    """Run one testcase/configuration across all seeds and summarize it."""
-    
-    # --- SỬA Ở ĐÂY: Chạy đúng logic của GA với mảng SEEDS ---
-    run_results = []
-    for seed in SEEDS:
-        total_distance = run_single_seed(
-            input_path=input_path,
-            time_limit=time_limit,
-            num_ants=num_ants,
-            alpha=alpha,
-            beta=beta,
-            rho=rho,
-            seed=seed,
-        )
-        run_results.append((seed, total_distance))
-
-    cost_min, _ = select_best_seed(run_results)
-    
-    return {
-        "testcase": testcase_name,
-        "num_ants": num_ants,
-        "alpha": alpha,
-        "beta": beta,
-        "rho": rho,
-        "cost_min": cost_min,
-    }
-
-
 def build_phase2_tasks(
     selected_testcases: set[str] | None = None,
-) -> list[tuple[str, str, float, int, float, float, float]]:
-    """Build independent Phase 2 tasks at testcase/config granularity."""
+) -> list[tuple[str, str, float, int, float, float, float, int]]:
+    """Build independent Phase 2 tasks at testcase/config/seed granularity."""
     tasks = []
     hyperparameter_grid = iter_hyperparameter_grid()
 
     for testcase_name, input_path, _, time_limit in discover_val_testcases(selected_testcases):
         for num_ants, alpha, beta, rho in hyperparameter_grid:
-            tasks.append(
-                (
-                    testcase_name,
-                    input_path,
-                    time_limit,
-                    num_ants,
-                    alpha,
-                    beta,
-                    rho,
+            for seed in SEEDS:
+                tasks.append(
+                    (
+                        testcase_name,
+                        input_path,
+                        time_limit,
+                        num_ants,
+                        alpha,
+                        beta,
+                        rho,
+                        seed,
+                    )
                 )
-            )
 
     return tasks
 
 
-def run_phase2_task(task: tuple[str, str, float, int, float, float, float]) -> dict[str, object]:
-    """Run one independent testcase/config task. Kept top-level for multiprocessing."""
-    testcase_name, input_path, time_limit, num_ants, alpha, beta, rho = task
-    return run_single_configuration(
-        testcase_name=testcase_name,
+def run_phase2_task(task: tuple[str, str, float, int, float, float, float, int]) -> dict[str, object]:
+    """Run one independent testcase/config/seed task."""
+    testcase_name, input_path, time_limit, num_ants, alpha, beta, rho, seed = task
+    cost = run_single_seed(
         input_path=input_path,
         time_limit=time_limit,
         num_ants=num_ants,
         alpha=alpha,
         beta=beta,
         rho=rho,
+        seed=seed,
     )
+    return {
+        "testcase": testcase_name,
+        "num_ants": num_ants,
+        "alpha": alpha,
+        "beta": beta,
+        "rho": rho,
+        "k": seed,
+        "cost": cost,
+    }
 
 
 def write_csv_header(output_path: str) -> None:
@@ -232,9 +183,9 @@ def append_csv_row(output_path: str, row: dict[str, object]) -> None:
 def execute_phase2(
     selected_testcases: set[str] | None = None,
     output_path: str = DEFAULT_OUTPUT_PATH,
-    workers: int = 8,
+    workers: int = 1,
 ) -> int:
-    """Execute Phase 2 and append rows immediately as tasks finish."""
+    """Execute Phase 2 and append detail rows immediately as tasks finish."""
     tasks = build_phase2_tasks(selected_testcases)
     write_csv_header(output_path)
 
@@ -248,8 +199,8 @@ def execute_phase2(
             completed += 1
             print(
                 f"[{completed}/{total_tasks}] Appended {row['testcase']} | "
-                f"num_ants={row['num_ants']} | alpha={row['alpha']} | "
-                f"beta={row['beta']} | rho={row['rho']} | cost_min={row['cost_min']}"
+                f"num_ants={row['num_ants']} | alpha={row['alpha']} | beta={row['beta']} | "
+                f"rho={row['rho']} | k={row['k']} | cost={row['cost']}"
             )
     else:
         with ProcessPoolExecutor(max_workers=workers) as executor:
@@ -260,8 +211,8 @@ def execute_phase2(
                 completed += 1
                 print(
                     f"[{completed}/{total_tasks}] Appended {row['testcase']} | "
-                    f"num_ants={row['num_ants']} | alpha={row['alpha']} | "
-                    f"beta={row['beta']} | rho={row['rho']} | cost_min={row['cost_min']}"
+                    f"num_ants={row['num_ants']} | alpha={row['alpha']} | beta={row['beta']} | "
+                    f"rho={row['rho']} | k={row['k']} | cost={row['cost']}"
                 )
 
     return total_tasks
@@ -269,7 +220,7 @@ def execute_phase2(
 
 def parse_args() -> argparse.Namespace:
     """Parse CLI arguments for optional targeted runs."""
-    parser = argparse.ArgumentParser(description="Phase 2 runner for Ant Colony Optimization")
+    parser = argparse.ArgumentParser(description="Phase 2 detail runner for Ant Colony Optimization")
     parser.add_argument(
         "--testcase",
         action="append",
@@ -280,12 +231,11 @@ def parse_args() -> argparse.Namespace:
         default=DEFAULT_OUTPUT_PATH,
         help="Output CSV path.",
     )
-    # --- SỬA Ở ĐÂY: Thêm tham số --workers để điều khiển số lượng worker parallel ---
     parser.add_argument(
         "--workers",
         type=int,
-        default=1, # --- SỬA Ở ĐÂY: Mặc định là 1 để chạy tuần tự, tránh lỗi multiprocessing trên Windows ---
-        help="Number of parallel worker processes. Default = 8.",
+        default=1,
+        help="Number of parallel worker processes. Use 1 to run sequentially.",
     )
     return parser.parse_args()
 
@@ -298,7 +248,7 @@ def main() -> None:
         output_path=args.output,
         workers=max(1, args.workers),
     )
-    print(f"Wrote {total_rows} rows to {args.output}")
+    print(f"Wrote {total_rows} detail rows to {args.output}")
 
 
 if __name__ == "__main__":

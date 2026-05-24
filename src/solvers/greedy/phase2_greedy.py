@@ -26,7 +26,7 @@ def main() -> None:
     os.makedirs(PHASE2_ROOT, exist_ok=True)
     csv_path = os.path.join(PHASE2_ROOT, "greedy.csv")
     
-    # Khởi tạo CSV (Chỉ cần 2 cột vì Greedy không có siêu tham số)
+    # Khởi tạo CSV 
     with open(csv_path, mode="w", newline="", encoding="utf-8") as f:
         writer = csv.writer(f)
         writer.writerow(["testcase", "cost_min"])
@@ -51,7 +51,7 @@ def main() -> None:
             continue
             
         time_limit = TIME_LIMITS[size_bucket]
-        print(f"{size_bucket.upper()}: {testcase_name}...")
+        print(f"{size_bucket.upper()}: {testcase_name}")
         
         with open(input_path, encoding="utf-8") as stream:
             original_stdin = sys.stdin
@@ -61,10 +61,12 @@ def main() -> None:
             finally:
                 sys.stdin = original_stdin
 
+        with open(csv_path, mode="a", newline="", encoding="utf-8") as f:
+            writer = csv.writer(f)
+            writer.writerow([testcase_name, total_distance])
+            
+        # Log ra terminal
         if total_distance != -1:
-            with open(csv_path, mode="a", newline="", encoding="utf-8") as f:
-                writer = csv.writer(f)
-                writer.writerow([testcase_name, total_distance])
             print(f"Cost_min = {total_distance}")
         else:
             print(f"Không tìm được nghiệm cho {testcase_name}")
