@@ -1,15 +1,15 @@
 """
-Phase 3 tuner for Adaptive Simulated Annealing.
+Phase 3 tuner for Genetic Algorithm.
 
 Workflow:
-1. Re-run the full ASA hyperparameter grid on the small val_set testcases,
-   because Phase 2 ASA skips small instances.
+1. Re-run the full GA hyperparameter grid on the small val_set testcases,
+   because Phase 2 GA skips small instances.
 2. Use the Phase 2 aggregate cost references as testcase-level min-cost baselines.
 3. For each testcase/configuration, compute:
    RFD% = ((cost_avg - cost_reference) / cost_reference) * 100
 4. Average testcase-level RFD% values within each size group.
 5. Select the minimum-RFD% configuration per group and save it to
-   results/phase3/asa.csv.
+   results/phase3/ga.csv.
 """
 from __future__ import annotations
 
@@ -23,22 +23,22 @@ if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
 from config.settings import SEEDS, TIME_LIMITS
-from src.solvers.simulated_annealing.adaptive_simulated_annealing import asa_solver
-from src.solvers.simulated_annealing.phase2 import iter_hyperparameter_grid
+from src.solvers.genetic_algorithm.ga import ga_solver
+from src.solvers.genetic_algorithm.phase2 import iter_hyperparameter_grid
 
 
 PHASE2_ROOT = os.path.join(project_root, "results", "phase2")
 PHASE3_ROOT = os.path.join(project_root, "results", "phase3")
 VAL_SET_ROOT = os.path.join(project_root, "data", "val_set")
 
-PHASE2_ASA_PATH = os.path.join(PHASE2_ROOT, "asa.csv")
+PHASE2_GA_PATH = os.path.join(PHASE2_ROOT, "ga.csv")
 PHASE2_AGGREGATE_PATH = os.path.join(PHASE2_ROOT, "aggregate_result.csv")
-DEFAULT_OUTPUT_PATH = os.path.join(PHASE3_ROOT, "asa.csv")
+DEFAULT_OUTPUT_PATH = os.path.join(PHASE3_ROOT, "ga.csv")
 
 OUTPUT_FIELDNAMES = [
-    "alpha",
-    "max_no_improve",
-    "reheat_ratio",
+    "pop_size",
+    "crossover_rate",
+    "mutation_rate",
     "avg_RFD",
     "group",
 ]
@@ -79,21 +79,21 @@ def load_small_references(references: dict[str, tuple[int, str]]) -> dict[str, i
 def run_single_small_seed(
     input_path: str,
     time_limit: float,
-    alpha: float,
-    max_no_improve: int,
-    reheat_ratio: float,
+    pop_size: int,
+    crossover_rate: float,
+    mutation_rate: float,
     seed: int,
 ) -> int:
-    """Run one ASA configuration on one small testcase and one seed."""
+    """Run one GA configuration on one small testcase and one seed."""
     with open(input_path, encoding="utf-8") as stream:
         original_stdin = sys.stdin
         try:
             sys.stdin = stream
-            _, total_distance, _ = asa_solver(
+            _, total_distance, _ = ga_solver(
                 time_limit=time_limit,
-                alpha=alpha,
-                max_no_improve=max_no_improve,
-                reheat_ratio=reheat_ratio,
+                pop_size=pop_size,
+                crossover_rate=crossover_rate,
+                mutation_rate=mutation_rate,
                 seed=seed,
             )
         finally:
@@ -117,7 +117,7 @@ def compute_rfd_percent(cost_avg: float, cost_reference: int) -> float:
 
 def compute_small_avg_rfd(
     references: dict[str, tuple[int, str]]
-) -> dict[tuple[float, int, float, str], float]:
+) -> dict[tuple[int, float, float, str], float]:
     """Run the small-case tuning loop and compute group-mean RFD% for small."""
     small_references = load_small_references(references)
     time_limit = TIME_LIMITS["small"]
@@ -125,10 +125,10 @@ def compute_small_avg_rfd(
     hyperparameter_grid = iter_hyperparameter_grid()
     total_configs = len(hyperparameter_grid)
 
-    for config_idx, (alpha, max_no_improve, reheat_ratio) in enumerate(hyperparameter_grid, start=1):
+    for config_idx, (pop_size, crossover_rate, mutation_rate) in enumerate(hyperparameter_grid, start=1):
         print(
-            f"[ASA small {config_idx}/{total_configs}] "
-            f"alpha={alpha}, max_no_improve={max_no_improve}, reheat_ratio={reheat_ratio}"
+            f"[GA small {config_idx}/{total_configs}] "
+            f"pop_size={pop_size}, crossover_rate={crossover_rate}, mutation_rate={mutation_rate}"
         )
         rfd_values = []
         for testcase, cost_reference in sorted(small_references.items()):
@@ -140,9 +140,9 @@ def compute_small_avg_rfd(
                 run_single_small_seed(
                     input_path=input_path,
                     time_limit=time_limit,
-                    alpha=alpha,
-                    max_no_improve=max_no_improve,
-                    reheat_ratio=reheat_ratio,
+                    pop_size=pop_size,
+                    crossover_rate=crossover_rate,
+                    mutation_rate=mutation_rate,
                     seed=seed,
                 )
                 for seed in SEEDS
@@ -154,22 +154,22 @@ def compute_small_avg_rfd(
         if not rfd_values:
             continue
 
-        avg_rfd_by_key[(alpha, max_no_improve, reheat_ratio, "small")] = sum(rfd_values) / len(rfd_values)
+        avg_rfd_by_key[(pop_size, crossover_rate, mutation_rate, "small")] = sum(rfd_values) / len(rfd_values)
 
     return avg_rfd_by_key
 
 
 def compute_phase2_grouped_avg_rfd(
     references: dict[str, tuple[int, str]],
-) -> dict[tuple[float, int, float, str], float]:
-    """Compute avg_RFD% per (configuration, group) from the Phase 2 ASA summary CSV."""
-    if not os.path.isfile(PHASE2_ASA_PATH):
-        raise FileNotFoundError(f"Missing Phase 2 ASA file: {PHASE2_ASA_PATH}")
+) -> dict[tuple[int, float, float, str], float]:
+    """Compute avg_RFD% per (configuration, group) from the Phase 2 GA summary CSV."""
+    if not os.path.isfile(PHASE2_GA_PATH):
+        raise FileNotFoundError(f"Missing Phase 2 GA file: {PHASE2_GA_PATH}")
 
-    sums: dict[tuple[float, int, float, str], float] = {}
-    counts: dict[tuple[float, int, float, str], int] = {}
+    sums: dict[tuple[int, float, float, str], float] = {}
+    counts: dict[tuple[int, float, float, str], int] = {}
 
-    with open(PHASE2_ASA_PATH, encoding="utf-8", newline="") as stream:
+    with open(PHASE2_GA_PATH, encoding="utf-8", newline="") as stream:
         reader = csv.DictReader(stream)
         for row in reader:
             testcase = row["testcase"]
@@ -181,33 +181,33 @@ def compute_phase2_grouped_avg_rfd(
             if group == "small" or cost_reference <= 0:
                 continue
 
-            alpha = float(row["alpha"])
-            max_no_improve = int(row["max_no_improve"])
-            reheat_ratio = float(row["reheat_ratio"])
+            pop_size = int(row["pop_size"])
+            crossover_rate = float(row["crossover_rate"])
+            mutation_rate = float(row["mutation_rate"])
             cost_avg = float(row["cost_avg"])
-            key = (alpha, max_no_improve, reheat_ratio, group)
+            key = (pop_size, crossover_rate, mutation_rate, group)
 
             rfd_value = float("inf") if cost_avg <= 0 else compute_rfd_percent(cost_avg, cost_reference)
             sums[key] = sums.get(key, 0.0) + rfd_value
             counts[key] = counts.get(key, 0) + 1
 
     if not sums:
-        raise RuntimeError("No valid ASA Phase 2 rows were found for medium/large Phase 3 aggregation.")
+        raise RuntimeError("No valid GA Phase 2 rows were found for medium/large Phase 3 aggregation.")
 
     return {key: sums[key] / counts[key] for key in sums}
 
 
 def select_best_config_per_group(
-    avg_rfd_by_key: dict[tuple[float, int, float, str], float]
+    avg_rfd_by_key: dict[tuple[int, float, float, str], float]
 ) -> list[dict[str, object]]:
     """Select the minimum avg_RFD configuration for each available group."""
     best_rows_by_group: dict[str, dict[str, object]] = {}
 
-    for (alpha, max_no_improve, reheat_ratio, group), avg_rfd in avg_rfd_by_key.items():
+    for (pop_size, crossover_rate, mutation_rate, group), avg_rfd in avg_rfd_by_key.items():
         candidate = {
-            "alpha": alpha,
-            "max_no_improve": max_no_improve,
-            "reheat_ratio": reheat_ratio,
+            "pop_size": pop_size,
+            "crossover_rate": crossover_rate,
+            "mutation_rate": mutation_rate,
             "avg_RFD": round(avg_rfd, 2),
             "group": group,
         }
@@ -217,12 +217,12 @@ def select_best_config_per_group(
             best_rows_by_group[group] = candidate
             continue
 
-        candidate_key = (avg_rfd, alpha, max_no_improve, reheat_ratio)
+        candidate_key = (avg_rfd, pop_size, crossover_rate, mutation_rate)
         current_key = (
             float(current_best["avg_RFD"]),
-            float(current_best["alpha"]),
-            int(current_best["max_no_improve"]),
-            float(current_best["reheat_ratio"]),
+            int(current_best["pop_size"]),
+            float(current_best["crossover_rate"]),
+            float(current_best["mutation_rate"]),
         )
         if candidate_key < current_key:
             best_rows_by_group[group] = candidate
@@ -231,7 +231,7 @@ def select_best_config_per_group(
 
 
 def write_phase3_csv(rows: list[dict[str, object]], output_path: str = DEFAULT_OUTPUT_PATH) -> None:
-    """Write the best ASA configuration per group to Phase 3 CSV."""
+    """Write the best GA configuration per group to Phase 3 CSV."""
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
     with open(output_path, "w", newline="", encoding="utf-8") as stream:
         writer = csv.DictWriter(stream, fieldnames=OUTPUT_FIELDNAMES)
