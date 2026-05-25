@@ -174,20 +174,37 @@ Thư mục: `src/solvers/simulated_annealing/`
 #### `phase2.py`
 
 - Runner Phase 2 trên `val_set`
-- Với mỗi `(testcase, cấu hình)`, chạy toàn bộ `SEEDS`
-- Lưu `cost_min`
+- Với mỗi `(testcase, cấu hình, seed)`, ghi detail vào `results/phase2/asa_detail.csv`
+
+#### `phase2_summary.py`
+
+- Build `results/phase2/asa.csv` từ `asa_detail.csv`
+- Summary theo `(testcase, configuration)` với `cost_min`, `cost_avg`
 
 #### `phase3.py`
 
 - Tuning tham số ASA trên `val_set`
-- Hiện đang đọc kết quả Phase 2 và tính `avg_RFD` từ `cost_min`
-- Đây là điểm cần đổi nếu muốn tune theo hiệu năng trung bình
+- Dùng `cost_reference` của Phase 2
+- Tính `avg_RFD` từ `cost_avg`
+- Chọn best config riêng cho `small`, `medium`, `large`
 
 #### `phase4.py`
 
 - Runner Phase 4 trên `test_set`
-- Với mỗi `(testcase, cấu hình)`, chạy toàn bộ `SEEDS`
-- Lưu `cost_min`
+- Đọc best config theo group từ `results/phase3/asa.csv`
+- Chạy trên toàn bộ `test_set`
+- Có hỗ trợ nhiều worker; `--workers 0` nghĩa là auto
+- Ghi detail per-seed vào `results/phase4/asa_detail.csv`
+
+#### `phase4_summary.py`
+
+- Build `results/phase4/asa.csv` từ `asa_detail.csv`
+- Summary theo testcase với các cột:
+  - `cost_min`
+  - `cost_max`
+  - `cost_avg`
+  - `cost_std`
+  - `t_best_avg`
 
 #### `ALGORITHM_DESCRIPTION.md`
 
@@ -212,14 +229,37 @@ Thư mục: `src/solvers/genetic_algorithm/`
 #### `phase2.py`
 
 - Runner Phase 2 trên `val_set`
-- Với mỗi `(testcase, cấu hình)`, chạy toàn bộ `SEEDS`
-- Lưu `cost_min`
+- Với mỗi `(testcase, cấu hình, seed)`, ghi detail vào `results/phase2/ga_detail.csv`
+
+#### `phase2_summary.py`
+
+- Build `results/phase2/ga.csv` từ `ga_detail.csv`
+- Summary theo `(testcase, configuration)` với `cost_min`, `cost_avg`
+
+#### `phase3.py`
+
+- Tuning tham số GA trên `val_set`
+- Dùng `cost_reference` của Phase 2
+- Tính `avg_RFD` từ `cost_avg`
+- Chọn best config riêng cho `small`, `medium`, `large`
 
 #### `phase4.py`
 
 - Runner Phase 4 trên `test_set`
-- Với mỗi `(testcase, cấu hình)`, chạy toàn bộ `SEEDS`
-- Lưu `cost_min`
+- Đọc best config theo group từ `results/phase3/ga.csv`
+- Chạy trên toàn bộ `test_set`
+- Có hỗ trợ nhiều worker; `--workers 0` nghĩa là auto
+- Ghi detail per-seed vào `results/phase4/ga_detail.csv`
+
+#### `phase4_summary.py`
+
+- Build `results/phase4/ga.csv` từ `ga_detail.csv`
+- Summary theo testcase với các cột:
+  - `cost_min`
+  - `cost_max`
+  - `cost_avg`
+  - `cost_std`
+  - `t_best_avg`
 
 ### 5.7 Ant Colony Optimization
 
@@ -240,8 +280,37 @@ Thư mục: `src/solvers/ant_colony/`
 #### `phase2_aco.py`
 
 - Runner Phase 2 trên `val_set`
-- Với mỗi `(testcase, cấu hình)`, chạy toàn bộ `SEEDS`
-- Lưu `cost_min`
+- Với mỗi `(testcase, cấu hình, seed)`, ghi detail vào `results/phase2/aco_detail.csv`
+
+#### `phase2_summary.py`
+
+- Build `results/phase2/aco.csv` từ `aco_detail.csv`
+- Summary theo `(testcase, configuration)` với `cost_min`, `cost_avg`
+
+#### `phase3.py`
+
+- Tuning tham số ACO trên `val_set`
+- Dùng `cost_reference` của Phase 2
+- Tính `avg_RFD` từ `cost_avg`
+- Chọn best config riêng cho `small`, `medium`, `large`
+
+#### `phase4.py`
+
+- Runner Phase 4 trên `test_set`
+- Đọc best config theo group từ `results/phase3/aco.csv`
+- Chạy trên toàn bộ `test_set`
+- Có hỗ trợ nhiều worker; `--workers 0` nghĩa là auto
+- Ghi detail per-seed vào `results/phase4/aco_detail.csv`
+
+#### `phase4_summary.py`
+
+- Build `results/phase4/aco.csv` từ `aco_detail.csv`
+- Summary theo testcase với các cột:
+  - `cost_min`
+  - `cost_max`
+  - `cost_avg`
+  - `cost_std`
+  - `t_best_avg`
 
 ---
 
@@ -252,6 +321,7 @@ Thư mục: `src/solvers/ant_colony/`
 - Helper dùng chung cho Phase 2 và Phase 4
 - Đọc cột `cost_min` từ các file CSV của thuật toán
 - Lấy min theo `testcase` để tạo `cost_reference`
+- Với các file detail không có cột `cost_min`, script sẽ bỏ qua và in warning
 
 ### `src/result_aggregator_phase1.py`
 
@@ -266,7 +336,7 @@ Thư mục: `src/solvers/ant_colony/`
 ### `src/result_aggregator_phase4.py`
 
 - Tổng hợp các CSV trong `results/phase4/`
-- Xuất `results/phase4/aggregate_result.csv`
+- Xuất `results/phase4/cost_reference.csv`
 
 ---
 
@@ -305,33 +375,41 @@ Thư mục: `src/solvers/ant_colony/`
 ### `results/phase2/`
 
 - Kết quả Phase 2 trên `val_set`
-- Hiện có các file:
+- Pipeline hiện sinh ra:
   - `greedy.csv`
   - `pywrapcp.csv`
   - `cpsat.csv`
-  - `asa.csv`
-  - `ga.csv`
-  - `aco.csv`
+  - `asa_detail.csv`, `asa.csv`
+  - `ga_detail.csv`, `ga.csv`
+  - `aco_detail.csv`, `aco.csv`
   - `aggregate_result.csv`
 
 ### `results/phase3/`
 
 - Kết quả tuning
-- Hiện có:
+- Pipeline hiện sinh ra:
   - `asa.csv`
+  - `ga.csv`
+  - `aco.csv`
 
 ### `results/phase4/`
 
 - Kết quả Phase 4 trên `test_set`
-- Hiện có:
-  - `asa.csv`
-  - `ga.csv`
-  - `aggregate_result.csv`
+- Pipeline hiện sinh ra:
+  - `greedy.csv`
+  - `pywrapcp.csv`
+  - `cpsat.csv`
+  - `asa_detail.csv`, `asa.csv`
+  - `ga_detail.csv`, `ga.csv`
+  - `aco_detail.csv`, `aco.csv`
+  - `cost_reference.csv` sau khi chạy `result_aggregator_phase4.py`
 
 Lưu ý:
 
-- Phase 4 hiện chưa có pipeline CP-SAT tương ứng cho phần `small` của `test_set`
-- Vì vậy `cost_reference` ở `results/phase4/aggregate_result.csv` chưa phản ánh đầy đủ workflow lý tưởng dùng CP-SAT làm mốc cho `small`
+- `greedy` và `pywrapcp` Phase 4 hiện đang bỏ qua `small`
+- `CP-SAT` Phase 4 hiện đang chạy `small` và `medium`, bỏ qua `large`
+- Metaheuristic Phase 4 chạy trên tất cả testcase và dùng best config theo group từ Phase 3
+- Sau khi rerun metaheuristic Phase 4, cần chạy thêm từng script `phase4_summary.py` trước khi aggregate
 
 ---
 
@@ -339,14 +417,15 @@ Lưu ý:
 
 ### Điều đang đúng
 
-- Phase 2 và Phase 4 đang đúng vai trò **best known reference**
-- Metaheuristic chạy nhiều seed rồi lưu `cost_min`
+- Phase 2 đang đúng vai trò build **best found solution / best-known reference** trên `val_set`
+- Phase 4 đang đúng vai trò build `cost_reference` trên `test_set`
+  - Tuy nhiên đây không phải BFS theo nghĩa exhaustive như Phase 2, vì metaheuristic ở Phase 4 chỉ chạy best config đã chọn từ Phase 3, không chạy full hyperparameter grid
+- Metaheuristic chạy nhiều seed, lưu detail per-seed, rồi build summary theo testcase
 - Aggregator lấy min giữa các thuật toán để tạo `cost_reference`
 
 ### Điều cần chỉnh
 
-- Phase 3 của ASA hiện đang tune theo `cost_min`
-- Nếu mục tiêu Final Evaluation là báo cáo `avg_cost`, `std_cost`, `avg_t_best`, thì tuning bằng `cost_min` là không nhất quán
+- Phase 5 aggregate/summary pipeline vẫn chưa được chuẩn hóa thành script riêng trong repo
 
 ### Hướng nên làm ở Phase 3
 

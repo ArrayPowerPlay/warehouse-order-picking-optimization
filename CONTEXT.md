@@ -261,14 +261,22 @@ PHASE 3: HYPERPARAMETER TUNING TRÊN val_set
       ↓
 PHASE 4: BUILD COST REFERENCE CHO test_set
   - Mục tiêu: tạo best-known cost reference cho đánh giá cuối
-  - Với metaheuristic: tiếp tục dùng cost_min trên nhiều seed
+  - Với metaheuristic:
+    - Dùng best config theo từng group đã chọn từ Phase 3
+    - Chạy nhiều seed trên test_set
+    - Lưu detail per-seed gồm ít nhất: cost, t_best
+    - Build summary per testcase gồm: cost_min, cost_max, cost_avg, cost_std, t_best_avg
+  - Với greedy / pywrapcp / CP-SAT:
+    - Chạy trực tiếp trên test_set theo pipeline riêng của từng solver
   - Aggregator lấy min giữa các thuật toán để tạo cost_reference theo testcase
       ↓
 PHASE 5: FINAL EVALUATION
-  - Chạy cấu hình tốt nhất từ Phase 3 trên test_set
-  - Với metaheuristic: chạy nhiều seed
-  - Báo cáo: min_cost, max_cost, avg_cost, std_cost, avg_t_best, RFD
-  - Tổng hợp theo testcase, group, overall
+  - Dùng cost_reference đã build từ Phase 4
+  - Gộp summary của tất cả thuật toán theo từng testcase
+  - Với metaheuristic:
+    - Mỗi group testcase dùng best config riêng đã chốt ở Phase 3
+    - Báo cáo theo testcase: cost_min, cost_max, cost_avg, cost_std, t_best_avg, RFD_avg
+  - Tổng hợp tiếp theo group và overall
 ```
 
 ### Quy ước phương pháp luận
@@ -276,6 +284,11 @@ PHASE 5: FINAL EVALUATION
 - **Phase 2/4** là pha xây `cost_reference`, nên dùng `cost_min` là đúng mục tiêu
 - **Phase 3** là pha chọn hyperparameter, nên không nên xếp hạng cấu hình bằng `cost_min`
 - Nếu Final Evaluation báo cáo `avg_cost/std_cost`, thì Tuning cũng phải dựa trên `avg_cost` để nhất quán
+- Ở **Phase 5**, đối tượng được đánh giá cho mỗi metaheuristic là policy:
+  - `small -> best_config_small`
+  - `medium -> best_config_medium`
+  - `large -> best_config_large`
+- Vì vậy metric `overall` vẫn hợp lệ nếu được tính trên toàn bộ testcase test_set, dù mỗi group có thể dùng cấu hình khác nhau
 
 ---
 
@@ -359,18 +372,30 @@ Kiểm tra hợp lệ của input.
 | ASA core | ✅ Implement xong |
 | ASA Phase 1 | ✅ Implement xong |
 | ASA Phase 2 | ✅ Implement xong |
-| ASA Phase 3 | ✅ Có script, nhưng hiện đang tune theo `cost_min` |
-| ASA Phase 4 | ✅ Implement xong |
+| ASA Phase 2 summary | ✅ Implement xong |
+| ASA Phase 3 | ✅ Implement xong, tune theo `avg_cost -> avg_RFD` |
+| ASA Phase 4 detail | ✅ Implement xong |
+| ASA Phase 4 summary | ✅ Implement xong |
 | GA core + wrapper | ✅ Implement xong |
 | GA Phase 1 | ✅ Implement xong |
 | GA Phase 2 | ✅ Implement xong |
-| GA Phase 4 | ✅ Implement xong |
+| GA Phase 2 summary | ✅ Implement xong |
+| GA Phase 3 | ✅ Implement xong, tune theo `avg_cost -> avg_RFD` |
+| GA Phase 4 detail | ✅ Implement xong |
+| GA Phase 4 summary | ✅ Implement xong |
 | ACO core + wrapper | ✅ Implement xong |
 | ACO Phase 1 | ✅ Implement xong |
 | ACO Phase 2 | ✅ Implement xong |
+| ACO Phase 2 summary | ✅ Implement xong |
+| ACO Phase 3 | ✅ Implement xong, tune theo `avg_cost -> avg_RFD` |
+| ACO Phase 4 detail | ✅ Implement xong |
+| ACO Phase 4 summary | ✅ Implement xong |
 | CP-SAT core | ✅ Implement xong |
 | CP-SAT Phase 1 | ✅ Implement xong |
 | CP-SAT Phase 2 | ✅ Có cho `val_set` small/medium |
+| CP-SAT Phase 4 | ✅ Có script cho `test_set` small/medium |
+| Greedy Phase 4 | ✅ Có script |
+| Greedy + pywrapcp Phase 4 | ✅ Có script |
 | `result_aggregator_phase2.py` | ✅ Implement xong |
 | `result_aggregator_phase4.py` | ✅ Implement xong |
 | Phase 5 evaluation pipeline | ⬜ Chưa hoàn thiện |
@@ -378,8 +403,12 @@ Kiểm tra hợp lệ của input.
 ### Ghi chú quan trọng
 
 - `PROJECT_ARCHITECTURE.md` và các tài liệu cũ từng mô tả repo theo cấu trúc file phẳng; mô tả đó không còn đúng
-- `results/phase4/` hiện chưa có pipeline đầy đủ cho phần `small` nếu muốn bám chặt workflow lý tưởng dùng CP-SAT làm mốc cho `test_set`
+- `results/phase4/` hiện dùng mô hình:
+  - metaheuristic lưu `*_detail.csv` theo seed
+  - `phase4_summary.py` build `*.csv` theo testcase
+- `result_aggregator_phase4.py` lấy `cost_min` từ các file summary/classical CSV để build `results/phase4/cost_reference.csv`
+- Nếu rerun `phase4.py` cho metaheuristic, cần rerun thêm `phase4_summary.py` trước khi aggregate Phase 4
 
 ---
 
-*Cập nhật lần cuối: 2026-05-23*
+*Cập nhật lần cuối: 2026-05-25*

@@ -40,6 +40,16 @@ FIELDNAMES = [
 ]
 
 
+def resolve_worker_count(requested_workers: int, total_tasks: int) -> int:
+    """Resolve the effective worker count from CLI input and task count."""
+    if total_tasks <= 0:
+        return 1
+    if requested_workers <= 0:
+        cpu_count = os.cpu_count() or 1
+        return max(1, min(cpu_count, total_tasks))
+    return max(1, min(requested_workers, total_tasks))
+
+
 def classify_testcase_size(m: int) -> str:
     """Classify testcase size bucket from M."""
     if m <= 20:
@@ -197,9 +207,15 @@ def execute_phase4(
     write_csv_header(output_path)
 
     total_tasks = len(tasks)
+    effective_workers = resolve_worker_count(workers, total_tasks)
     completed = 0
 
-    if workers <= 1:
+    print(
+        f"[*] Phase 4 GA detail run: tasks={total_tasks}, requested_workers={workers}, "
+        f"effective_workers={effective_workers}"
+    )
+
+    if effective_workers <= 1:
         for task in tasks:
             row = run_phase4_task(task)
             append_csv_row(output_path, row)
@@ -211,7 +227,7 @@ def execute_phase4(
                 f"cost={row['cost']} | t_best={row['t_best']}"
             )
     else:
-        with ProcessPoolExecutor(max_workers=workers) as executor:
+        with ProcessPoolExecutor(max_workers=effective_workers) as executor:
             futures = [executor.submit(run_phase4_task, task) for task in tasks]
             for future in as_completed(futures):
                 row = future.result()
@@ -243,8 +259,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--workers",
         type=int,
-        default=1,
-        help="Number of parallel worker processes. Use 1 to run sequentially.",
+        default=0,
+        help="Number of parallel worker processes. Use 0 to auto-select, 1 to run sequentially.",
     )
     return parser.parse_args()
 
@@ -255,7 +271,7 @@ def main() -> None:
     total_rows = execute_phase4(
         selected_testcases=selected_testcases,
         output_path=args.output,
-        workers=max(1, args.workers),
+        workers=args.workers,
     )
     print(f"Wrote {total_rows} detail rows to {args.output}")
 

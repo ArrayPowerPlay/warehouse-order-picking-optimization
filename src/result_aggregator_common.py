@@ -67,16 +67,29 @@ def testcase_sort_key_by_prefix(testcase_name: str) -> tuple[int, int, str]:
     return (priority, extract_id_number(testcase_name), testcase_name)
 
 
-def collect_cost_rows(phase_dir: str, aggregate_filename: str = "aggregate_result.csv") -> list[pd.DataFrame]:
-    """Read all algorithm CSV files in a phase directory except the aggregate output."""
+def collect_cost_rows(
+    phase_dir: str,
+    excluded_filenames: set[str] | None = None,
+) -> list[pd.DataFrame]:
+    """Read all algorithm summary CSV files in a phase directory."""
     all_dfs = []
+    excluded = {filename.lower() for filename in (excluded_filenames or set())}
 
     for filename in sorted(os.listdir(phase_dir)):
-        if not filename.endswith(".csv") or filename == aggregate_filename:
+        filename_lower = filename.lower()
+        if not filename_lower.endswith(".csv"):
+            continue
+        if filename_lower in excluded or filename_lower.endswith("_detail.csv"):
             continue
 
         file_path = os.path.join(phase_dir, filename)
         try:
+            header_df = pd.read_csv(file_path, nrows=0)
+            required_columns = {"testcase", "cost_min"}
+            if not required_columns.issubset(set(header_df.columns)):
+                print(f"[INFO] Skipped {filename}: missing required columns {sorted(required_columns)}")
+                continue
+
             df = pd.read_csv(file_path, usecols=["testcase", "cost_min"])
             if not df.empty:
                 all_dfs.append(df)
