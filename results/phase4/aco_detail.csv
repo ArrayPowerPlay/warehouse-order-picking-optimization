@@ -1,0 +1,2 @@
+testcase,num_ants,alpha,beta,rho,k,cost
+dist_cluster_35_N30_M300,50,1.0,4.0,0.1,0,25179

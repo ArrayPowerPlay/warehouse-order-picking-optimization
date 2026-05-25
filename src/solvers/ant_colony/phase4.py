@@ -1,10 +1,10 @@
 """
-Phase 4 detail runner for Adaptive Simulated Annealing.
+Phase 4 detail runner for Ant Colony Optimization.
 
-This script scans all test_set testcases, selects the best Phase 3 ASA
+This script scans all test_set testcases, selects the best Phase 3 ACO
 configuration for each testcase size group, repeats that configuration on all
 configured seeds, and writes one detail row per seed to
-results/phase4/asa_detail.csv.
+results/phase4/aco_detail.csv.
 """
 from __future__ import annotations
 
@@ -20,20 +20,21 @@ if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
 from config.settings import SEEDS, TIME_LIMITS
-from src.solvers.simulated_annealing.adaptive_simulated_annealing import asa_solver
+from src.solvers.ant_colony.aco import aco_solver
 from src.solvers.utils import read_input
 
 
 TEST_SET_ROOT = os.path.join(project_root, "data", "test_set")
-PHASE3_CONFIG_PATH = os.path.join(project_root, "results", "phase3", "asa.csv")
+PHASE3_CONFIG_PATH = os.path.join(project_root, "results", "phase3", "aco.csv")
 PHASE4_ROOT = os.path.join(project_root, "results", "phase4")
-DEFAULT_OUTPUT_PATH = os.path.join(PHASE4_ROOT, "asa_detail.csv")
+DEFAULT_OUTPUT_PATH = os.path.join(PHASE4_ROOT, "aco_detail.csv")
 
 FIELDNAMES = [
     "testcase",
+    "num_ants",
     "alpha",
-    "max_no_improve",
-    "reheat_ratio",
+    "beta",
+    "rho",
     "k",
     "cost",
     "t_best",
@@ -51,23 +52,24 @@ def classify_testcase_size(m: int) -> str:
     raise ValueError(f"Cannot classify testcase with M={m}.")
 
 
-def load_best_configs() -> dict[str, tuple[float, int, float]]:
-    """Load best ASA configuration per size group from Phase 3 output."""
+def load_best_configs() -> dict[str, tuple[int, float, float, float]]:
+    """Load best ACO configuration per size group from Phase 3 output."""
     if not os.path.isfile(PHASE3_CONFIG_PATH):
-        raise FileNotFoundError(f"Missing Phase 3 ASA config file: {PHASE3_CONFIG_PATH}")
+        raise FileNotFoundError(f"Missing Phase 3 ACO config file: {PHASE3_CONFIG_PATH}")
 
     best_configs = {}
     with open(PHASE3_CONFIG_PATH, encoding="utf-8", newline="") as stream:
         reader = csv.DictReader(stream)
         for row in reader:
             best_configs[row["group"]] = (
+                int(row["num_ants"]),
                 float(row["alpha"]),
-                int(row["max_no_improve"]),
-                float(row["reheat_ratio"]),
+                float(row["beta"]),
+                float(row["rho"]),
             )
 
     if not best_configs:
-        raise RuntimeError(f"No Phase 3 ASA configurations found in {PHASE3_CONFIG_PATH}")
+        raise RuntimeError(f"No Phase 3 ACO configurations found in {PHASE3_CONFIG_PATH}")
     return best_configs
 
 
@@ -96,21 +98,23 @@ def discover_testcases(selected_testcases: set[str] | None = None) -> list[tuple
 def run_single_seed(
     input_path: str,
     time_limit: float,
+    num_ants: int,
     alpha: float,
-    max_no_improve: int,
-    reheat_ratio: float,
+    beta: float,
+    rho: float,
     seed: int,
 ) -> tuple[int, float]:
-    """Run one ASA configuration on one seed and return total_distance and t_best."""
+    """Run one ACO configuration on one seed and return total_distance and t_best."""
     with open(input_path, encoding="utf-8") as stream:
         original_stdin = sys.stdin
         try:
             sys.stdin = stream
-            _, total_distance, t_best = asa_solver(
+            _, total_distance, t_best = aco_solver(
                 time_limit=time_limit,
+                num_ants=num_ants,
                 alpha=alpha,
-                max_no_improve=max_no_improve,
-                reheat_ratio=reheat_ratio,
+                beta=beta,
+                rho=rho,
                 seed=seed,
             )
         finally:
@@ -121,26 +125,27 @@ def run_single_seed(
 
 def build_phase4_tasks(
     selected_testcases: set[str] | None = None,
-) -> list[tuple[str, str, float, float, int, float, int]]:
+) -> list[tuple[str, str, float, int, float, float, float, int]]:
     """Build independent Phase 4 tasks at testcase/config/seed granularity."""
     tasks = []
     best_configs = load_best_configs()
 
     for testcase_name, input_path, size_bucket, time_limit in discover_testcases(selected_testcases):
         if size_bucket not in best_configs:
-            print(f"[WARNING] Missing ASA config for group '{size_bucket}', skip testcase {testcase_name}")
+            print(f"[WARNING] Missing ACO config for group '{size_bucket}', skip testcase {testcase_name}")
             continue
 
-        alpha, max_no_improve, reheat_ratio = best_configs[size_bucket]
+        num_ants, alpha, beta, rho = best_configs[size_bucket]
         for seed in SEEDS:
             tasks.append(
                 (
                     testcase_name,
                     input_path,
                     time_limit,
+                    num_ants,
                     alpha,
-                    max_no_improve,
-                    reheat_ratio,
+                    beta,
+                    rho,
                     seed,
                 )
             )
@@ -148,22 +153,24 @@ def build_phase4_tasks(
     return tasks
 
 
-def run_phase4_task(task: tuple[str, str, float, float, int, float, int]) -> dict[str, object]:
+def run_phase4_task(task: tuple[str, str, float, int, float, float, float, int]) -> dict[str, object]:
     """Run one independent testcase/config/seed task."""
-    testcase_name, input_path, time_limit, alpha, max_no_improve, reheat_ratio, seed = task
+    testcase_name, input_path, time_limit, num_ants, alpha, beta, rho, seed = task
     cost, t_best = run_single_seed(
         input_path=input_path,
         time_limit=time_limit,
+        num_ants=num_ants,
         alpha=alpha,
-        max_no_improve=max_no_improve,
-        reheat_ratio=reheat_ratio,
+        beta=beta,
+        rho=rho,
         seed=seed,
     )
     return {
         "testcase": testcase_name,
+        "num_ants": num_ants,
         "alpha": alpha,
-        "max_no_improve": max_no_improve,
-        "reheat_ratio": reheat_ratio,
+        "beta": beta,
+        "rho": rho,
         "k": seed,
         "cost": cost,
         "t_best": round(t_best, 6),
@@ -206,9 +213,8 @@ def execute_phase4(
             completed += 1
             print(
                 f"[{completed}/{total_tasks}] Appended {row['testcase']} | "
-                f"alpha={row['alpha']} | max_no_improve={row['max_no_improve']} | "
-                f"reheat_ratio={row['reheat_ratio']} | k={row['k']} | "
-                f"cost={row['cost']} | t_best={row['t_best']}"
+                f"num_ants={row['num_ants']} | alpha={row['alpha']} | beta={row['beta']} | "
+                f"rho={row['rho']} | k={row['k']} | cost={row['cost']} | t_best={row['t_best']}"
             )
     else:
         with ProcessPoolExecutor(max_workers=workers) as executor:
@@ -219,9 +225,8 @@ def execute_phase4(
                 completed += 1
                 print(
                     f"[{completed}/{total_tasks}] Appended {row['testcase']} | "
-                    f"alpha={row['alpha']} | max_no_improve={row['max_no_improve']} | "
-                    f"reheat_ratio={row['reheat_ratio']} | k={row['k']} | "
-                    f"cost={row['cost']} | t_best={row['t_best']}"
+                    f"num_ants={row['num_ants']} | alpha={row['alpha']} | beta={row['beta']} | "
+                    f"rho={row['rho']} | k={row['k']} | cost={row['cost']} | t_best={row['t_best']}"
                 )
 
     return total_tasks
@@ -229,7 +234,7 @@ def execute_phase4(
 
 def parse_args() -> argparse.Namespace:
     """Parse CLI arguments for optional targeted runs."""
-    parser = argparse.ArgumentParser(description="Phase 4 detail runner for Adaptive Simulated Annealing")
+    parser = argparse.ArgumentParser(description="Phase 4 detail runner for Ant Colony Optimization")
     parser.add_argument(
         "--testcase",
         action="append",
