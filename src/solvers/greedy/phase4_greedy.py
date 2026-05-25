@@ -29,7 +29,7 @@ def main() -> None:
     # Khởi tạo CSV 
     with open(csv_path, mode="w", newline="", encoding="utf-8") as f:
         writer = csv.writer(f)
-        writer.writerow(["testcase", "cost_min"])
+        writer.writerow(["testcase", "cost_min", "cost_max", "cost_avg", "cost_std", "t_best_avg"])
         
     # Đọc từ TEST_SET_ROOT
     for filename in sorted(os.listdir(TEST_SET_ROOT)):
@@ -43,13 +43,6 @@ def main() -> None:
             _, m, _, _, _ = read_input(stream)
             
         size_bucket = classify_testcase_size(m)
-        
-        # =========================================================
-        # BỎ QUA TESTCASE SMALL 
-        # =========================================================
-        if size_bucket == "small":
-            print(f"Bỏ qua SMALL: {testcase_name} ")
-            continue
             
         time_limit = TIME_LIMITS[size_bucket]
         print(f"\n{size_bucket.upper()}: {testcase_name}")
@@ -64,11 +57,21 @@ def main() -> None:
 
         with open(csv_path, mode="a", newline="", encoding="utf-8") as f:
             writer = csv.writer(f)
-            writer.writerow([testcase_name, total_distance])
+            if total_distance != -1:
+                writer.writerow([
+                    testcase_name, 
+                    total_distance, # cost_min
+                    total_distance, # cost_max
+                    total_distance, # cost_avg
+                    0.0,            # cost_std
+                    t_best          # t_best_avg
+                ])
+            else:
+                writer.writerow([testcase_name, -1, -1, -1, 0.0, -1.0])
             
         # Log terminal
         if total_distance != -1:
-            print(f"Cost_min = {total_distance}")
+            print(f"Cost_min = {total_distance} (t_best: {t_best}s)")
         else:
             print(f"Không tìm được nghiệm cho {testcase_name}")
             

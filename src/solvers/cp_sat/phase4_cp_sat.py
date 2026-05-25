@@ -29,10 +29,9 @@ def main() -> None:
     os.makedirs(PHASE4_ROOT, exist_ok=True)
     csv_path = os.path.join(PHASE4_ROOT, "cpsat.csv")
     
-    # Khởi tạo file CSV và ghi dòng Tiêu đề (Header)
     with open(csv_path, mode="w", newline="", encoding="utf-8") as f:
         writer = csv.writer(f)
-        writer.writerow(["testcase", "num_search_workers", "cost_min"])
+        writer.writerow(["testcase", "num_search_workers", "cost_min", "cost_max", "cost_avg", "cost_std", "t_best_avg"])
         
     # Quét trực tiếp toàn bộ file trong data/test_set
     for filename in sorted(os.listdir(TEST_SET_ROOT)):
@@ -62,17 +61,31 @@ def main() -> None:
             try:
                 sys.stdin = stream
                 num_workers = 0 
+                # Nhận cả t_best từ hàm giải
                 route, total_distance, t_best = cpsat_solver(time_limit=time_limit, num_search_workers=num_workers)
             finally:
                 sys.stdin = original_stdin
 
         with open(csv_path, mode="a", newline="", encoding="utf-8") as f:
             writer = csv.writer(f)
-            writer.writerow([testcase_name, num_workers, total_distance])
+            if total_distance != -1:
+                # Vì là thuật toán tất định (chạy 1 lần), nên min=max=avg, std=0
+                writer.writerow([
+                    testcase_name, 
+                    num_workers, 
+                    total_distance, # cost_min
+                    total_distance, # cost_max
+                    total_distance, # cost_avg
+                    0.0,            # cost_std
+                    t_best          # t_best_avg
+                ])
+            else:
+                # Trường hợp vô nghiệm
+                writer.writerow([testcase_name, num_workers, -1, -1, -1, 0.0, -1.0])
             
         # Log terminal
         if total_distance != -1:
-            print(f"BFS_Cost = {total_distance} ")
+            print(f"BFS_Cost = {total_distance} (t_best: {t_best}s)")
         else:
             print(f"Không tìm được nghiệm cho {testcase_name}")
             
