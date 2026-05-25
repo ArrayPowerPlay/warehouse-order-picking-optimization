@@ -31,17 +31,39 @@ TEST_SET_ROOT = os.path.join(project_root, "data", "test_set")
 PHASE4_ROOT = os.path.join(project_root, "results", "phase4")
 DEFAULT_OUTPUT_PATH = os.path.join(PHASE4_ROOT, "asa.csv")
 
-ALPHA_GRID = (0.99, 0.995, 0.999)
-MAX_NO_IMPROVE_GRID = (1000, 2000)
-REHEAT_RATIO_GRID = (0.2, 0.3, 0.5)
+# =========================================================================
+# --- THÊM VÀO: Đường dẫn tới file config tốt nhất từ Phase 3 và file detail ---
+PHASE3_CONFIG_PATH = os.path.join(project_root, "results", "phase3", "asa.csv")
+DETAIL_OUTPUT_PATH = os.path.join(PHASE4_ROOT, "asa_detail.csv")
+# =========================================================================
 
+# =========================================================================
+# --- SỬA Ở ĐÂY: Vô hiệu hoá lưới siêu tham số tĩnh vì sẽ lấy từ Phase 3 ---
+# ALPHA_GRID = (0.99, 0.995, 0.999)
+# MAX_NO_IMPROVE_GRID = (1000, 2000)
+# REHEAT_RATIO_GRID = (0.1, 0.2, 0.3)
+# =========================================================================
+
+# =========================================================================
+# --- SỬA Ở ĐÂY: Cập nhật FIELDNAMES theo yêu cầu và thêm DETAIL_FIELDNAMES ---
 FIELDNAMES = [
     "testcase",
     "alpha",
     "max_no_improve",
     "reheat_ratio",
     "cost_min",
+    "cost_avg", # THÊM VÀO: Thêm cột cost_avg
 ]
+
+DETAIL_FIELDNAMES = [
+    "testcase",
+    "alpha",
+    "max_no_improve",
+    "reheat_ratio",
+    "k",          # THÊM VÀO: Tham số k
+    "cost",       # THÊM VÀO: Cost chi tiết từng lần chạy
+]
+# =========================================================================
 
 
 def classify_testcase_size(m: int) -> str:
@@ -55,13 +77,36 @@ def classify_testcase_size(m: int) -> str:
     raise ValueError(f"Cannot classify testcase with M={m}.")
 
 
-def iter_hyperparameter_grid() -> list[tuple[float, int, float]]:
-    """Return the fixed ASA grid used for Phase 4."""
-    return list(product(ALPHA_GRID, MAX_NO_IMPROVE_GRID, REHEAT_RATIO_GRID))
+# =========================================================================
+# --- THÊM VÀO: Hàm đọc kết quả Phase 3 để lấy cấu hình tốt nhất ---
+def load_best_configs() -> dict[str, tuple[float, int, float]]:
+    """Đọc file kết quả phase3 và trả về dict map group -> config tốt nhất."""
+    configs = {}
+    if not os.path.exists(PHASE3_CONFIG_PATH):
+        raise FileNotFoundError(f"Không tìm thấy file cấu hình {PHASE3_CONFIG_PATH}. Vui lòng chạy Phase 3 trước.")
+    
+    with open(PHASE3_CONFIG_PATH, "r", encoding="utf-8") as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            group = row["group"]
+            alpha = float(row["alpha"])
+            max_no_improve = int(row["max_no_improve"])
+            reheat_ratio = float(row["reheat_ratio"])
+            configs[group] = (alpha, max_no_improve, reheat_ratio)
+    return configs
+# =========================================================================
 
 
-def discover_test_testcases(selected_testcases: set[str] | None = None) -> list[tuple[str, str, str, float]]:
-    """Discover medium/large test_set testcases and their time limits."""
+# =========================================================================
+# --- SỬA Ở ĐÂY: Vô hiệu hoá hàm tạo lưới cũ ---
+# def iter_hyperparameter_grid() -> list[tuple[float, int, float]]:
+#     """Return the fixed ASA grid used for Phase 4."""
+#     return list(product(ALPHA_GRID, MAX_NO_IMPROVE_GRID, REHEAT_RATIO_GRID))
+# =========================================================================
+
+
+def discover_testcases(selected_testcases: set[str] | None = None) -> list[tuple[str, str, str, float]]:
+    """Discover test_set testcases and their time limits."""
     testcases = []
 
     for filename in sorted(os.listdir(TEST_SET_ROOT)):
@@ -77,8 +122,12 @@ def discover_test_testcases(selected_testcases: set[str] | None = None) -> list[
             _, m, _, _, _ = read_input(stream)
 
         size_bucket = classify_testcase_size(m)
-        if size_bucket == "small":
-            continue
+        
+        # =========================================================================
+        # --- SỬA Ở ĐÂY: Bỏ qua lệnh skip testcase small ---
+        # if size_bucket == "small":
+        #     continue
+        # =========================================================================
 
         testcases.append((testcase_name, input_path, size_bucket, TIME_LIMITS[size_bucket]))
 
@@ -111,20 +160,11 @@ def run_single_seed(
     return total_distance
 
 
-def select_best_seed(run_results: list[tuple[int, int]]) -> tuple[int, int | None]:
-    """
-    Select the best seed result for one configuration.
-
-    Each item in run_results is (seed, total_distance).
-    If at least one feasible result exists, choose the minimum feasible cost and
-    its seed. If all results are infeasible, return (-1, None).
-    """
-    feasible_results = [(seed, cost) for seed, cost in run_results if cost >= 0]
-    if not feasible_results:
-        return -1, None
-
-    best_seed, best_cost = min(feasible_results, key=lambda item: (item[1], item[0]))
-    return best_cost, best_seed
+# =========================================================================
+# --- SỬA Ở ĐÂY: Hàm này không dùng nữa, logic tính toán được gộp vào bên dưới ---
+# def select_best_seed(run_results: list[tuple[int, int]]) -> tuple[int, int | None]:
+#     ...
+# =========================================================================
 
 
 def run_single_configuration(
@@ -134,10 +174,14 @@ def run_single_configuration(
     alpha: float,
     max_no_improve: int,
     reheat_ratio: float,
-) -> dict[str, object]:
+) -> tuple[dict[str, object], list[dict[str, object]]]: # --- SỬA Ở ĐÂY: Trả về đồng thời kết quả tổng hợp và chi tiết
     """Run one testcase/configuration across all seeds and summarize it."""
     run_results = []
-    for seed in SEEDS:
+    detail_rows = []
+
+    # =========================================================================
+    # --- SỬA Ở ĐÂY: Dùng enumerate lấy tham số k đếm từ 0 ---
+    for k, seed in enumerate(SEEDS):
         total_distance = run_single_seed(
             input_path=input_path,
             time_limit=time_limit,
@@ -146,16 +190,40 @@ def run_single_configuration(
             reheat_ratio=reheat_ratio,
             seed=seed,
         )
-        run_results.append((seed, total_distance))
+        run_results.append(total_distance)
+        
+        # --- THÊM VÀO: Đóng gói kết quả cho file asa_detail.csv ---
+        detail_rows.append({
+            "testcase": testcase_name,
+            "alpha": alpha,
+            "max_no_improve": max_no_improve,
+            "reheat_ratio": reheat_ratio,
+            "k": k,
+            "cost": total_distance,
+        })
+    # =========================================================================
 
-    cost_min, _ = select_best_seed(run_results)
-    return {
+    # =========================================================================
+    # --- SỬA Ở ĐÂY: Tính toán đồng thời cả cost_min và cost_avg ---
+    feasible_results = [cost for cost in run_results if cost >= 0]
+    if not feasible_results:
+        cost_min = -1
+        cost_avg = -1.0
+    else:
+        cost_min = min(feasible_results)
+        cost_avg = round(sum(feasible_results) / len(feasible_results), 2)
+    # =========================================================================
+
+    main_row = {
         "testcase": testcase_name,
         "alpha": alpha,
         "max_no_improve": max_no_improve,
         "reheat_ratio": reheat_ratio,
         "cost_min": cost_min,
+        "cost_avg": cost_avg, # --- THÊM VÀO: Trường mới ---
     }
+    
+    return main_row, detail_rows
 
 
 def build_phase4_tasks(
@@ -163,25 +231,37 @@ def build_phase4_tasks(
 ) -> list[tuple[str, str, float, float, int, float]]:
     """Build independent Phase 4 tasks at testcase/config granularity."""
     tasks = []
-    hyperparameter_grid = iter_hyperparameter_grid()
+    
+    # =========================================================================
+    # --- SỬA Ở ĐÂY: Sử dụng list cấu hình tốt nhất thay vì hyperparameter_grid ---
+    best_configs = load_best_configs()
+    # =========================================================================
 
-    for testcase_name, input_path, _, time_limit in discover_test_testcases(selected_testcases):
-        for alpha, max_no_improve, reheat_ratio in hyperparameter_grid:
-            tasks.append(
-                (
-                    testcase_name,
-                    input_path,
-                    time_limit,
-                    alpha,
-                    max_no_improve,
-                    reheat_ratio,
-                )
+    for testcase_name, input_path, size_bucket, time_limit in discover_testcases(selected_testcases):
+        # =========================================================================
+        # --- SỬA Ở ĐÂY: Map testcase bucket vào config chuẩn của nó ---
+        if size_bucket not in best_configs:
+            print(f"Warning: Không có cấu hình cho {size_bucket}. Bỏ qua testcase {testcase_name}.")
+            continue
+            
+        alpha, max_no_improve, reheat_ratio = best_configs[size_bucket]
+
+        tasks.append(
+            (
+                testcase_name,
+                input_path,
+                time_limit,
+                alpha,
+                max_no_improve,
+                reheat_ratio,
             )
+        )
+        # =========================================================================
 
     return tasks
 
 
-def run_phase4_task(task: tuple[str, str, float, float, int, float]) -> dict[str, object]:
+def run_phase4_task(task: tuple[str, str, float, float, int, float]) -> tuple[dict[str, object], list[dict[str, object]]]:
     """Run one independent testcase/config task. Kept top-level for multiprocessing."""
     testcase_name, input_path, time_limit, alpha, max_no_improve, reheat_ratio = task
     return run_single_configuration(
@@ -194,21 +274,35 @@ def run_phase4_task(task: tuple[str, str, float, float, int, float]) -> dict[str
     )
 
 
-def write_csv_header(output_path: str) -> None:
-    """Create or overwrite CSV and write header once."""
-    os.makedirs(os.path.dirname(output_path), exist_ok=True)
-    with open(output_path, "w", newline="", encoding="utf-8") as stream:
+# =========================================================================
+# --- SỬA Ở ĐÂY: Viết lại hàm hỗ trợ write header và append song song 2 file ---
+def write_csv_headers(main_output_path: str, detail_output_path: str) -> None:
+    """Create or overwrite CSV and write header once for both files."""
+    os.makedirs(os.path.dirname(main_output_path), exist_ok=True)
+    with open(main_output_path, "w", newline="", encoding="utf-8") as stream:
         writer = csv.DictWriter(stream, fieldnames=FIELDNAMES)
         writer.writeheader()
         stream.flush()
 
-
-def append_csv_row(output_path: str, row: dict[str, object]) -> None:
-    """Append one finished row immediately and flush it."""
-    with open(output_path, "a", newline="", encoding="utf-8") as stream:
-        writer = csv.DictWriter(stream, fieldnames=FIELDNAMES)
-        writer.writerow(row)
+    os.makedirs(os.path.dirname(detail_output_path), exist_ok=True)
+    with open(detail_output_path, "w", newline="", encoding="utf-8") as stream:
+        writer = csv.DictWriter(stream, fieldnames=DETAIL_FIELDNAMES)
+        writer.writeheader()
         stream.flush()
+
+
+def append_csv_rows(main_output_path: str, detail_output_path: str, main_row: dict, detail_rows: list) -> None:
+    """Append one finished row to main file and multiple rows to detail file immediately."""
+    with open(main_output_path, "a", newline="", encoding="utf-8") as stream:
+        writer = csv.DictWriter(stream, fieldnames=FIELDNAMES)
+        writer.writerow(main_row)
+        stream.flush()
+
+    with open(detail_output_path, "a", newline="", encoding="utf-8") as stream:
+        writer = csv.DictWriter(stream, fieldnames=DETAIL_FIELDNAMES)
+        writer.writerows(detail_rows)
+        stream.flush()
+# =========================================================================
 
 
 def execute_phase4(
@@ -218,32 +312,37 @@ def execute_phase4(
 ) -> int:
     """Execute Phase 4 and append rows immediately as tasks finish."""
     tasks = build_phase4_tasks(selected_testcases)
-    write_csv_header(output_path)
+    
+    # =========================================================================
+    # --- SỬA Ở ĐÂY: Truyền đường dẫn file chi tiết vào hàm ---
+    detail_output_path = DETAIL_OUTPUT_PATH
+    write_csv_headers(output_path, detail_output_path)
+    # =========================================================================
 
     total_tasks = len(tasks)
     completed = 0
 
     if workers <= 1:
         for task in tasks:
-            row = run_phase4_task(task)
-            append_csv_row(output_path, row)
+            main_row, detail_rows = run_phase4_task(task)
+            append_csv_rows(output_path, detail_output_path, main_row, detail_rows)
             completed += 1
             print(
-                f"[{completed}/{total_tasks}] Appended {row['testcase']} | "
-                f"alpha={row['alpha']} | max_no_improve={row['max_no_improve']} | "
-                f"reheat_ratio={row['reheat_ratio']} | cost_min={row['cost_min']}"
+                f"[{completed}/{total_tasks}] Appended {main_row['testcase']} | "
+                f"alpha={main_row['alpha']} | max_no_improve={main_row['max_no_improve']} | "
+                f"reheat_ratio={main_row['reheat_ratio']} | cost_min={main_row['cost_min']} | cost_avg={main_row['cost_avg']}"
             )
     else:
         with ProcessPoolExecutor(max_workers=workers) as executor:
             futures = [executor.submit(run_phase4_task, task) for task in tasks]
             for future in as_completed(futures):
-                row = future.result()
-                append_csv_row(output_path, row)
+                main_row, detail_rows = future.result()
+                append_csv_rows(output_path, detail_output_path, main_row, detail_rows)
                 completed += 1
                 print(
-                    f"[{completed}/{total_tasks}] Appended {row['testcase']} | "
-                    f"alpha={row['alpha']} | max_no_improve={row['max_no_improve']} | "
-                    f"reheat_ratio={row['reheat_ratio']} | cost_min={row['cost_min']}"
+                    f"[{completed}/{total_tasks}] Appended {main_row['testcase']} | "
+                    f"alpha={main_row['alpha']} | max_no_improve={main_row['max_no_improve']} | "
+                    f"reheat_ratio={main_row['reheat_ratio']} | cost_min={main_row['cost_min']} | cost_avg={main_row['cost_avg']}"
                 )
 
     return total_tasks
@@ -279,7 +378,7 @@ def main() -> None:
         output_path=args.output,
         workers=max(1, args.workers),
     )
-    print(f"Wrote {total_rows} rows to {args.output}")
+    print(f"Wrote {total_rows} rows to {args.output} and detailed results to {DETAIL_OUTPUT_PATH}")
 
 
 if __name__ == "__main__":
