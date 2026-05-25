@@ -25,6 +25,7 @@ if project_root not in sys.path:
 from config.settings import SEEDS, TIME_LIMITS
 from src.solvers.ant_colony.aco import aco_solver
 from src.solvers.ant_colony.phase2_aco import iter_hyperparameter_grid
+from src.solvers.ant_colony.phase2_summary import main as rebuild_phase2_summary
 
 
 PHASE2_ROOT = os.path.join(project_root, "results", "phase2")
@@ -61,6 +62,24 @@ def load_phase2_references() -> dict[str, tuple[int, str]]:
     if not references:
         raise RuntimeError("Phase 2 aggregate file is empty.")
     return references
+
+
+def ensure_phase2_summary_ready() -> None:
+    """Ensure results/phase2/aco.csv exists and contains cost_avg."""
+    if not os.path.isfile(PHASE2_ACO_PATH):
+        rebuild_phase2_summary()
+        return
+
+    with open(PHASE2_ACO_PATH, encoding="utf-8", newline="") as stream:
+        reader = csv.DictReader(stream)
+        fieldnames = reader.fieldnames or []
+
+    if "cost_avg" not in fieldnames:
+        print(
+            "[INFO] results/phase2/aco.csv is missing cost_avg. "
+            "Rebuilding it from results/phase2/aco_detail.csv."
+        )
+        rebuild_phase2_summary()
 
 
 def load_small_references(references: dict[str, tuple[int, str]]) -> dict[str, int]:
@@ -167,6 +186,7 @@ def compute_phase2_grouped_avg_rfd(
     references: dict[str, tuple[int, str]],
 ) -> dict[tuple[int, float, float, float, str], float]:
     """Compute avg_RFD% per (configuration, group) from the Phase 2 ACO summary CSV."""
+    ensure_phase2_summary_ready()
     if not os.path.isfile(PHASE2_ACO_PATH):
         raise FileNotFoundError(f"Missing Phase 2 ACO file: {PHASE2_ACO_PATH}")
 
