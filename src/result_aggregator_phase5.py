@@ -13,7 +13,7 @@ PHASE4_DIR = os.path.join(project_root, "results", "phase4")
 PHASE5_DIR = os.path.join(project_root, "results", "phase5")
 
 def main():
-    print("BAT DAU CHAY PHASE 5: TONG HOP KET QUA VA TINH RFD")
+    print("BAT DAU CHAY PHASE 5: TONG HOP KET QUA VA TINH RPD")
     
     # 1. Doc file cost_reference (Anchor)
     ref_path = os.path.join(PHASE4_DIR, "cost_reference.csv")
@@ -64,13 +64,13 @@ def main():
         # Merge vao bang tong hop theo kieu left join (O nao thieu cua CP-SAT se tu dong de trong)
         df_agg = pd.merge(df_agg, df_algo_filtered, on='testcase', how='left')
         
-        # 3. Tinh toan chi so RFD 
+        # 3. Tinh toan chi so RPD 
         avg_col = f"{algo_name}_cost_avg"
-        rfd_col = f"{algo_name}_RFD"
+        rpd_col = f"{algo_name}_RPD"
         
         if avg_col in df_agg.columns:
-            df_agg[rfd_col] = ((df_agg[avg_col] - df_agg['cost_reference']) / df_agg['cost_reference']) * 100
-            df_agg[rfd_col] = df_agg[rfd_col].round(2)
+            df_agg[rpd_col] = ((df_agg[avg_col] - df_agg['cost_reference']) / df_agg['cost_reference']) * 100
+            df_agg[rpd_col] = df_agg[rpd_col].round(2)
 
     # 4. Sap xep cot de dua cost_reference xuong phia cuoi bang 
     cols = [c for c in df_agg.columns if c != 'cost_reference'] + ['cost_reference']

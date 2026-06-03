@@ -1,4 +1,4 @@
-pop_size,crossover_rate,mutation_rate,avg_RFD,group
+pop_size,crossover_rate,mutation_rate,avg_RPD,group
 100,0.7,0.2,0.0,small
 200,0.9,0.05,3.48,medium
 100,0.9,0.05,6.03,large

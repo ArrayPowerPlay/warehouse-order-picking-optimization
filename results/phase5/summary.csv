@@ -1,4 +1,4 @@
-group,ACO_RFD,ACO_t_best_avg,ASA_RFD,ASA_t_best_avg,CPSAT_RFD,CPSAT_t_best_avg,GA_RFD,GA_t_best_avg,GREEDY_RFD,GREEDY_t_best_avg,PYWRAPCP_RFD,PYWRAPCP_t_best_avg,winner
+group,ACO_RPD,ACO_t_best_avg,ASA_RPD,ASA_t_best_avg,CPSAT_RPD,CPSAT_t_best_avg,GA_RPD,GA_t_best_avg,GREEDY_RPD,GREEDY_t_best_avg,PYWRAPCP_RPD,PYWRAPCP_t_best_avg,winner
 small,0.0,0.24,0.55,3.26,0.0,0.03,2.04,0.0,38.86,0.0,0.0,10.0,CPSAT
 medium,11.48,310.34,31.6,226.49,4.95,180.71,6.25,180.97,29.04,0.08,4.53,271.67,PYWRAPCP
 large,40.98,653.86,13.88,210.54,,,5.55,572.54,28.89,1.04,0.29,375.0,PYWRAPCP

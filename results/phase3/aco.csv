@@ -1,4 +1,4 @@
-num_ants,alpha,beta,rho,avg_RFD,group
+num_ants,alpha,beta,rho,avg_RPD,group
 50,1.0,4.0,0.1,0.0,small
 50,1.0,4.0,0.1,13.5,medium
 50,2.0,4.0,0.1,29.79,large

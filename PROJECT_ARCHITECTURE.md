@@ -185,7 +185,7 @@ Thư mục: `src/solvers/simulated_annealing/`
 
 - Tuning tham số ASA trên `val_set`
 - Dùng `cost_reference` của Phase 2
-- Tính `avg_RFD` từ `cost_avg`
+- Tính `avg_RPD` từ `cost_avg`
 - Chọn best config riêng cho `small`, `medium`, `large`
 
 #### `phase4.py`
@@ -240,7 +240,7 @@ Thư mục: `src/solvers/genetic_algorithm/`
 
 - Tuning tham số GA trên `val_set`
 - Dùng `cost_reference` của Phase 2
-- Tính `avg_RFD` từ `cost_avg`
+- Tính `avg_RPD` từ `cost_avg`
 - Chọn best config riêng cho `small`, `medium`, `large`
 
 #### `phase4.py`
@@ -291,7 +291,7 @@ Thư mục: `src/solvers/ant_colony/`
 
 - Tuning tham số ACO trên `val_set`
 - Dùng `cost_reference` của Phase 2
-- Tính `avg_RFD` từ `cost_avg`
+- Tính `avg_RPD` từ `cost_avg`
 - Chọn best config riêng cho `small`, `medium`, `large`
 
 #### `phase4.py`
@@ -432,9 +432,9 @@ Lưu ý:
 1. Giữ nguyên `cost_reference` từ Phase 2
 2. Với mỗi `(testcase, configuration)`, chạy nhiều seed
 3. Tính `avg_cost` và `std_cost`
-4. Tính `RFD` bằng `avg_cost` so với `cost_reference`
-5. Chọn cấu hình có `avg_RFD` nhỏ nhất theo group
-6. Dùng `std_RFD` và `avg_t_best` làm tie-break
+4. Tính `RPD` bằng `avg_cost` so với `cost_reference`
+5. Chọn cấu hình có `avg_RPD` nhỏ nhất theo group
+6. Dùng `std_RPD` và `avg_t_best` làm tie-break
 
 Nếu chỉ đổi logic tuning, phần cần rerun trước hết là:
 

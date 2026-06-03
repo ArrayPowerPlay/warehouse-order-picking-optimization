@@ -255,9 +255,9 @@ PHASE 3: HYPERPARAMETER TUNING TRÊN val_set
   - Mục tiêu: chọn cấu hình tốt nhất theo hiệu năng kỳ vọng, không theo run may mắn
   - Với mỗi (testcase, cấu hình), chạy nhiều seed
   - Tính ít nhất: min_cost, avg_cost, std_cost, avg_t_best
-  - Dùng avg_cost để tính RFD theo cost_reference của Phase 2
-  - Chọn cấu hình có avg_RFD nhỏ nhất theo từng nhóm kích thước
-  - Tie-break khuyến nghị: std_RFD nhỏ hơn, rồi avg_t_best nhỏ hơn
+  - Dùng avg_cost để tính RPD theo cost_reference của Phase 2
+  - Chọn cấu hình có avg_RPD nhỏ nhất theo từng nhóm kích thước
+  - Tie-break khuyến nghị: std_RPD nhỏ hơn, rồi avg_t_best nhỏ hơn
       ↓
 PHASE 4: BUILD COST REFERENCE CHO test_set
   - Mục tiêu: tạo best-known cost reference cho đánh giá cuối
@@ -275,7 +275,7 @@ PHASE 5: FINAL EVALUATION
   - Gộp summary của tất cả thuật toán theo từng testcase
   - Với metaheuristic:
     - Mỗi group testcase dùng best config riêng đã chốt ở Phase 3
-    - Báo cáo theo testcase: cost_min, cost_max, cost_avg, cost_std, t_best_avg, RFD_avg
+    - Báo cáo theo testcase: cost_min, cost_max, cost_avg, cost_std, t_best_avg, RPD_avg
   - Tổng hợp tiếp theo group và overall
 ```
 
@@ -310,13 +310,13 @@ Chọn cấu hình có hiệu năng **tốt trung bình** và **ổn định**, 
    - `std_cost`
    - `avg_t_best`
 4. Tính:
-   - `RFD_case = ((avg_cost - cost_reference) / cost_reference) * 100`
-5. Với mỗi configuration, lấy trung bình `RFD_case` trên toàn bộ testcase trong cùng group:
-   - `avg_RFD_group`
-6. Chọn configuration có `avg_RFD_group` nhỏ nhất.
+   - `RPD_case = ((avg_cost - cost_reference) / cost_reference) * 100`
+5. Với mỗi configuration, lấy trung bình `RPD_case` trên toàn bộ testcase trong cùng group:
+   - `avg_RPD_group`
+6. Chọn configuration có `avg_RPD_group` nhỏ nhất.
 7. Tie-break:
-   - `std_RFD_group` nhỏ hơn
-   - `avg_t_best_group` nhỏ hơn
+   - `std_RPD_group nhỏ hơn`
+   - `avg_t_best_group nhỏ hơn`
 
 ### Không nên làm
 
@@ -373,21 +373,21 @@ Kiểm tra hợp lệ của input.
 | ASA Phase 1 | ✅ Implement xong |
 | ASA Phase 2 | ✅ Implement xong |
 | ASA Phase 2 summary | ✅ Implement xong |
-| ASA Phase 3 | ✅ Implement xong, tune theo `avg_cost -> avg_RFD` |
+| ASA Phase 3 | ✅ Implement xong, tune theo `avg_cost -> avg_RPD` |
 | ASA Phase 4 detail | ✅ Implement xong |
 | ASA Phase 4 summary | ✅ Implement xong |
 | GA core + wrapper | ✅ Implement xong |
 | GA Phase 1 | ✅ Implement xong |
 | GA Phase 2 | ✅ Implement xong |
 | GA Phase 2 summary | ✅ Implement xong |
-| GA Phase 3 | ✅ Implement xong, tune theo `avg_cost -> avg_RFD` |
+| GA Phase 3 | ✅ Implement xong, tune theo `avg_cost -> avg_RPD` |
 | GA Phase 4 detail | ✅ Implement xong |
 | GA Phase 4 summary | ✅ Implement xong |
 | ACO core + wrapper | ✅ Implement xong |
 | ACO Phase 1 | ✅ Implement xong |
 | ACO Phase 2 | ✅ Implement xong |
 | ACO Phase 2 summary | ✅ Implement xong |
-| ACO Phase 3 | ✅ Implement xong, tune theo `avg_cost -> avg_RFD` |
+| ACO Phase 3 | ✅ Implement xong, tune theo `avg_cost -> avg_RPD` |
 | ACO Phase 4 detail | ✅ Implement xong |
 | ACO Phase 4 summary | ✅ Implement xong |
 | CP-SAT core | ✅ Implement xong |
