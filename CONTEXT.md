@@ -68,44 +68,11 @@ Ví dụ tên file:
 
 ---
 
-## 3. Cấu trúc thư mục
-
-```text
-warehouse-order-picking-optimization/
-├── config/
-│   └── settings.py
-├── data/
-│   ├── val_set/
-│   └── test_set/
-├── notebooks/
-│   ├── tuning/
-│   │   ├── genetic_algorithm_tuning.ipynb
-│   │   └── simulated_annealing_tuning.ipynb
-│   └── final_evaluation.ipynb
-├── results/
-│   ├── phase1/
-│   ├── phase2/
-│   ├── phase3/
-│   └── phase4/
-├── src/
-│   ├── generators/
-│   ├── solvers/
-│   ├── result_aggregator_common.py
-│   ├── result_aggregator_phase1.py
-│   ├── result_aggregator_phase2.py
-│   └── result_aggregator_phase4.py
-├── CONTEXT.md
-├── PROJECT_ARCHITECTURE.md
-├── README.md
-├── TESTCASE_CLASSIFICATION.md
-└── requirements.txt
-```
-
 ---
 
-## 4. Thuật toán hiện có
+## 3. Thuật toán hiện có
 
-### 4.1 Greedy
+### 3.1 Greedy
 
 **Thư mục:** `src/solvers/greedy/`
 
@@ -115,7 +82,7 @@ warehouse-order-picking-optimization/
 
 Không có hyperparameter để tune.
 
-### 4.2 Greedy + Pruning + pywrapcp
+### 3.2 Greedy + Pruning + pywrapcp
 
 **Thư mục:** `src/solvers/greedy_prunning_pywrapcp/`
 
@@ -127,7 +94,7 @@ Pipeline:
 
 Không có lưới hyperparameter; chỉ phụ thuộc `time_limit`.
 
-### 4.3 CP-SAT
+### 3.3 CP-SAT
 
 **Thư mục:** `src/solvers/cp_sat/`
 
@@ -138,7 +105,7 @@ Lưu ý:
 - Có thể trả về nghiệm tốt nhất tìm được trong giới hạn thời gian
 - Không phải lúc nào cũng chứng minh tối ưu tuyệt đối nếu hết `time_limit`
 
-### 4.4 Adaptive Simulated Annealing
+### 3.4 Adaptive Simulated Annealing
 
 **Thư mục:** `src/solvers/simulated_annealing/`
 
@@ -152,7 +119,7 @@ Hyperparameter grid hiện tại:
 | `max_no_improve` | `1000`, `2000` |
 | `reheat_ratio` | `0.2`, `0.3`, `0.5` |
 
-### 4.5 Genetic Algorithm
+### 3.5 Genetic Algorithm
 
 **Thư mục:** `src/solvers/genetic_algorithm/`
 
@@ -166,7 +133,7 @@ Hyperparameter grid hiện tại:
 | `crossover_rate` | `0.7`, `0.8`, `0.9` |
 | `mutation_rate` | `0.05`, `0.1`, `0.2` |
 
-### 4.6 Ant Colony Optimization
+### 3.6 Ant Colony Optimization
 
 **Thư mục:** `src/solvers/ant_colony/`
 
@@ -183,7 +150,7 @@ Hyperparameter grid hiện tại:
 
 ---
 
-## 5. Dataset và phân nhóm testcase
+## 4. Dataset và phân nhóm testcase
 
 Cả `val_set` và `test_set` đều có 39 file.
 
@@ -210,7 +177,7 @@ Cả `val_set` và `test_set` đều có 39 file.
 
 ---
 
-## 6. Cấu hình thực nghiệm hiện tại
+## 5. Cấu hình thực nghiệm hiện tại
 
 Từ `config/settings.py`:
 
@@ -227,13 +194,12 @@ Từ `config/settings.py`:
 
 Lưu ý:
 
-- Tài liệu cũ từng ghi `k = 10 seed`
 - Repo hiện tại đang chạy thực tế với `k = len(SEEDS) = 3`
-- Nếu cần báo cáo nghiêm túc hơn cho metaheuristic, nên tăng lên ít nhất 10 seed
+
 
 ---
 
-## 7. Workflow thực nghiệm
+## 6. Workflow thực nghiệm
 
 ```text
 batch_generator.py
@@ -292,7 +258,7 @@ PHASE 5: FINAL EVALUATION
 
 ---
 
-## 8. Hướng chọn tham số đúng chuẩn cho Phase 3
+## 7. Hướng chọn tham số đúng chuẩn cho Phase 3
 
 Đây là hướng khuyến nghị cho mọi metaheuristic như ASA, GA, ACO.
 
@@ -334,7 +300,7 @@ Chọn cấu hình có hiệu năng **tốt trung bình** và **ổn định**, 
 
 ---
 
-## 9. Hàm dùng chung trong `utils.py`
+## 8. Hàm dùng chung trong `utils.py`
 
 ### `read_input(stream=None) -> (N, M, Q, d, q)`
 
@@ -361,7 +327,7 @@ Kiểm tra hợp lệ của input.
 
 ---
 
-## 10. Trạng thái hiện tại
+## 9. Trạng thái hiện tại
 
 | Hạng mục | Trạng thái |
 |---|---|
