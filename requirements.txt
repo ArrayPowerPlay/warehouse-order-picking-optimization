@@ -1,4 +1,5 @@
-ortools
-tqdm
-matplotlib
-pandas
+numpy==2.3.2
+pandas==2.3.3
+ortools==9.15.6755
+matplotlib==3.10.8
+tqdm==4.67.3
