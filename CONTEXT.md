@@ -239,10 +239,8 @@ PHASE 4: BUILD COST REFERENCE CHO test_set
 PHASE 5: FINAL EVALUATION
   - Dùng cost_reference đã build từ Phase 4
   - Gộp summary của tất cả thuật toán theo từng testcase
-  - Với metaheuristic:
-    - Mỗi group testcase dùng best config riêng đã chốt ở Phase 3
-    - Báo cáo theo testcase: cost_min, cost_max, cost_avg, cost_std, t_best_avg, RPD_avg
-  - Tổng hợp tiếp theo group và overall
+  - Chạy result_aggregator_phase5.py để tạo kết quả tổng hợp chi tiết results/phase5/aggregate_result.csv
+  - Chạy result_summary_phase5.py để tạo kết quả summary theo group và overall results/phase5/summary.csv
 ```
 
 ### Quy ước phương pháp luận
@@ -364,7 +362,7 @@ Kiểm tra hợp lệ của input.
 | Greedy + pywrapcp Phase 4 | ✅ Có script |
 | `result_aggregator_phase2.py` | ✅ Implement xong |
 | `result_aggregator_phase4.py` | ✅ Implement xong |
-| Phase 5 evaluation pipeline | ⬜ Chưa hoàn thiện |
+| Phase 5 evaluation pipeline | ✅ Hoàn thiện (Đã có script aggregator và summary) |
 
 ### Ghi chú quan trọng
 
@@ -377,4 +375,4 @@ Kiểm tra hợp lệ của input.
 
 ---
 
-*Cập nhật lần cuối: 2026-05-25*
+*Cập nhật lần cuối: 2026-06-08*

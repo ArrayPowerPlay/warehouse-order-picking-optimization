@@ -32,7 +32,6 @@ warehouse-order-picking-optimization/
 ├── data/
 │   ├── val_set/
 │   └── test_set/
-├── notebooks/
 ├── results/
 │   ├── phase1/
 │   ├── phase2/
@@ -44,10 +43,13 @@ warehouse-order-picking-optimization/
 │   ├── solvers/
 │   ├── result_aggregator_phase1.py
 │   ├── result_aggregator_phase2.py
-│   └── result_aggregator_phase4.py
+│   ├── result_aggregator_phase4.py
+│   ├── result_aggregator_phase5.py
+│   └── result_summary_phase5.py
 ├── CONTEXT.md
 ├── PROJECT_ARCHITECTURE.md
-└── README.md
+├── README.md
+└── TESTCASE_CLASSIFICATION.md
 ```
 
 ## Workflow thực nghiệm
@@ -137,49 +139,33 @@ Aggregator chỉ đọc các file summary có cột `testcase` và `cost_min`, v
 - `cost_reference.csv`
 - `aggregate_result.csv` cũ nếu còn tồn tại
 
-## Gợi ý cho Phase 5
+## Phase 5: Final Evaluation trên test_set
 
-### Bảng testcase-level
+Chạy các script sau để thực hiện tổng hợp kết quả cuối cùng trên `test_set`:
 
-Nên gộp theo từng testcase:
-
-- `group`
-- `cost_reference`
-- với mỗi metaheuristic:
-  - `*_cost_min`
-  - `*_cost_max`
-  - `*_cost_avg`
-  - `*_cost_std`
-  - `*_t_best_avg`
-  - `*_RFD_avg`
-
-Trong đó:
-
-```text
-RFD_avg = ((cost_avg - cost_reference) / cost_reference) * 100
+```bash
+python src/result_aggregator_phase5.py
+python src/result_summary_phase5.py
 ```
 
-### Overall chuẩn nhất
+### Các file output tại `results/phase5/`
 
-Không nên tính `overall` bằng trung bình thường của `small`, `medium`, `large`.
+- **`aggregate_result.csv`**: Chứa kết quả chi tiết cho từng testcase hợp lệ (đã lọc bỏ các testcase vô nghiệm có `cost_reference = -1`). Gồm các thông tin `cost_min`, `cost_max`, `cost_avg`, `t_best_avg` và RPD của từng thuật toán trên từng testcase.
+  - Công thức tính RPD:
+    ```text
+    RPD = ((cost_avg - cost_reference) / cost_reference) * 100
+    ```
+- **`summary.csv`**: Bảng tổng hợp hiệu năng trung bình theo từng nhóm kích thước (`small`, `medium`, `large`) và `overall` (trung bình trên toàn bộ testcase cho các thuật toán chạy đủ cả 3 nhóm). Bảng cũng chỉ ra thuật toán chiến thắng (`winner`) cho từng nhóm dựa trên `RPD` nhỏ nhất (tiếp tục sử dụng `t_best_avg` làm tie-breaker nếu RPD bằng nhau).
 
-Cách chuẩn nhất là:
+### Đánh giá Overall
 
-- tính trực tiếp trên toàn bộ testcase ở bảng testcase-level
-- tức là:
-
-```text
-overall_RFD = average(RFD_avg của tất cả testcase)
-overall_t_best = average(t_best_avg của tất cả testcase)
-```
-
-Cách này vẫn đúng ngay cả khi mỗi group dùng một best config khác nhau, vì ở Phase 5 bạn đang đánh giá một **policy cố định theo group**:
-
-- `small -> best_config_small`
-- `medium -> best_config_medium`
-- `large -> best_config_large`
+Chỉ số `overall` được tính trung bình trực tiếp từ toàn bộ testcase hợp lệ ở bảng chi tiết (chỉ áp dụng đối với các thuật toán chạy đầy đủ cả 3 nhóm testcase). Việc tính toán này đánh giá một chính sách (policy) cố định theo nhóm kích thước:
+- `small` -> best config của nhóm small
+- `medium` -> best config của nhóm medium
+- `large` -> best config của nhóm large
 
 ## Tài liệu chi tiết
 
 - [CONTEXT.md](./CONTEXT.md)
 - [PROJECT_ARCHITECTURE.md](./PROJECT_ARCHITECTURE.md)
+- [TESTCASE_CLASSIFICATION.md](./TESTCASE_CLASSIFICATION.md)

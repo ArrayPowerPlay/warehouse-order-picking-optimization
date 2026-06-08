@@ -13,23 +13,21 @@ warehouse-order-picking-optimization/
 ├── data/
 │   ├── val_set/
 │   └── test_set/
-├── notebooks/
-│   ├── tuning/
-│   │   ├── genetic_algorithm_tuning.ipynb
-│   │   └── simulated_annealing_tuning.ipynb
-│   └── final_evaluation.ipynb
 ├── results/
 │   ├── phase1/
 │   ├── phase2/
 │   ├── phase3/
-│   └── phase4/
+│   ├── phase4/
+│   └── phase5/
 ├── src/
 │   ├── generators/
 │   ├── solvers/
 │   ├── result_aggregator_common.py
 │   ├── result_aggregator_phase1.py
 │   ├── result_aggregator_phase2.py
-│   └── result_aggregator_phase4.py
+│   ├── result_aggregator_phase4.py
+│   ├── result_aggregator_phase5.py
+│   └── result_summary_phase5.py
 ├── CONTEXT.md
 ├── PROJECT_ARCHITECTURE.md
 ├── README.md
@@ -338,25 +336,25 @@ Thư mục: `src/solvers/ant_colony/`
 - Tổng hợp các CSV trong `results/phase4/`
 - Xuất `results/phase4/cost_reference.csv`
 
+### `src/result_aggregator_phase5.py`
+
+- Đọc `results/phase4/cost_reference.csv` làm mốc đánh giá (lọc bỏ các testcase vô nghiệm có `cost_reference = -1`).
+- Gộp các kết quả `cost_min`, `cost_max`, `cost_avg`, `t_best_avg` từ các file summary của thuật toán trong `results/phase4/` (bỏ qua file detail và reference).
+- Đổi các giá trị `-1` (vô nghiệm của từng thuật toán đơn lẻ) thành NaN.
+- Tính chỉ số RPD của từng thuật toán: `((cost_avg - cost_reference) / cost_reference) * 100`.
+- Xuất bảng kết quả chi tiết ra `results/phase5/aggregate_result.csv`.
+
+### `src/result_summary_phase5.py`
+
+- Đọc `results/phase5/aggregate_result.csv` và gộp thông tin nhóm kích thước (`group`).
+- Tính trung bình RPD và t_best_avg cho từng nhóm (`small`, `medium`, `large`).
+- Tính trung bình `overall` cho toàn bộ testcase (chỉ áp dụng đối với các thuật toán chạy đầy đủ cả 3 nhóm).
+- Tìm thuật toán tốt nhất (`winner`) cho mỗi hàng dựa trên RPD nhỏ nhất (tiếp tục xét t_best_avg làm tie-breaker).
+- Xuất bảng tổng hợp kết quả ra `results/phase5/summary.csv`.
+
 ---
 
-## 7. Notebook
-
-### `notebooks/tuning/simulated_annealing_tuning.ipynb`
-
-- Notebook tuning cho ASA
-
-### `notebooks/tuning/genetic_algorithm_tuning.ipynb`
-
-- Notebook tuning cho GA
-
-### `notebooks/final_evaluation.ipynb`
-
-- Notebook phục vụ tổng hợp và trực quan hóa cuối
-
----
-
-## 8. Thư mục kết quả
+## 7. Thư mục kết quả
 
 ### `results/phase1/`
 
@@ -411,9 +409,16 @@ Lưu ý:
 - Metaheuristic Phase 4 chạy trên tất cả testcase và dùng best config theo group từ Phase 3
 - Sau khi rerun metaheuristic Phase 4, cần chạy thêm từng script `phase4_summary.py` trước khi aggregate
 
+### `results/phase5/`
+
+- Kết quả Phase 5 (Final Evaluation) trên `test_set`
+- Chứa:
+  - `aggregate_result.csv`: Chứa kết quả chi tiết từng testcase (loại bỏ testcase vô nghiệm), cột RPD cho từng thuật toán.
+  - `summary.csv`: Bảng tổng hợp theo nhóm kích thước (small, medium, large, overall), kèm theo winner của từng nhóm.
+
 ---
 
-## 9. Trạng thái phương pháp luận
+## 8. Trạng thái phương pháp luận
 
 ### Điều đang đúng
 
@@ -422,10 +427,7 @@ Lưu ý:
   - Tuy nhiên đây không phải BFS theo nghĩa exhaustive như Phase 2, vì metaheuristic ở Phase 4 chỉ chạy best config đã chọn từ Phase 3, không chạy full hyperparameter grid
 - Metaheuristic chạy nhiều seed, lưu detail per-seed, rồi build summary theo testcase
 - Aggregator lấy min giữa các thuật toán để tạo `cost_reference`
-
-### Điều cần chỉnh
-
-- Phase 5 aggregate/summary pipeline vẫn chưa được chuẩn hóa thành script riêng trong repo
+- Phase 5 đã hoàn thiện với pipeline tổng hợp kết quả (`result_aggregator_phase5.py`) và summary (`result_summary_phase5.py`) tự động tính toán RPD và chọn winner cho từng nhóm kích thước.
 
 ### Hướng nên làm ở Phase 3
 
@@ -442,3 +444,7 @@ Nếu chỉ đổi logic tuning, phần cần rerun trước hết là:
 - `Phase 5`
 
 Không bắt buộc rerun `Phase 2` và `Phase 4` nếu vẫn giữ định nghĩa `cost_reference` là best-known cost.
+
+---
+
+*Cập nhật lần cuối: 2026-06-08*
