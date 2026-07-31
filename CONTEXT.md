@@ -1,4 +1,4 @@
-# CONTEXT.md — Warehouse Order Picking Optimization
+                                                              # CONTEXT.md — Warehouse Order Picking Optimization
 
 > File này tổng hợp thông tin cốt lõi về project, workflow thực nghiệm, và các quyết định phương pháp luận đang áp dụng. Khi logic thực nghiệm thay đổi, cập nhật file này trước.
 
